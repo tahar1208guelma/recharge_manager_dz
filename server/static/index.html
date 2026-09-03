@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة إدارة التراخيص - Recharge Manager DZ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1E3A8A;
+      --primary-light: #3B82F6;
+      --accent: #0D9488;
+      --bg: #F8FAFC;
+      --surface: #FFFFFF;
+      --text: #0F172A;
+      --text-muted: #64748B;
+      --border: #E2E8F0;
+      --success: #10B981;
+      --danger: #EF4444;
+      --warning: #F59E0B;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 30px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+    .title { font-size: 24px; font-weight: 800; color: var(--primary); }
+    .subtitle { color: var(--text-muted); font-size: 14px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .stat-card { background: var(--surface); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .stat-val { font-size: 28px; font-weight: 800; color: var(--primary); margin-top: 5px; }
+    .stat-lbl { font-size: 13px; color: var(--text-muted); }
+    .card { background: var(--surface); border-radius: 12px; border: 1px solid var(--border); padding: 24px; margin-bottom: 30px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .card-title { font-size: 18px; font-weight: 700; }
+    .btn { background: var(--primary); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 14px; }
+    .btn:hover { background: var(--primary-light); }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: var(--bg); }
+    table { width: 100%; border-collapse: collapse; text-align: right; }
+    th { padding: 12px 16px; background: var(--bg); color: var(--text-muted); font-size: 13px; font-weight: 700; border-bottom: 1px solid var(--border); }
+    td { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-block; }
+    .badge-active { background: #D1FAE5; color: #065F46; }
+    .badge-trial { background: #DBEAFE; color: #1E40AF; }
+    .badge-expired { background: #FEE2E2; color: #991B1B; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
+    .input-group label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--text-muted); }
+    .input-group input, .input-group select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; }
+    .input-group input:focus, .input-group select:focus { border-color: var(--primary); }
+    .code { font-family: monospace; font-weight: 700; color: var(--primary); background: #EFF6FF; padding: 3px 8px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <div class="title">لوحة إدارة التراخيص - Recharge Manager DZ</div>
+        <div class="subtitle">نظام ترخيص SaaS وإدارة الاشتراكات والأجهزة المرتبطة</div>
+      </div>
+      <button class="btn" onclick="loadData()">تحديث البيانات ⟳</button>
+    </header>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-lbl">إجمالي التراخيص</div>
+        <div class="stat-val" id="totalLicenses">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-lbl">التراخيص النشطة</div>
+        <div class="stat-val" id="activeLicenses" style="color: var(--success);">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-lbl">الأجهزة المرتبطة (Bound Devices)</div>
+        <div class="stat-val" id="boundDevices" style="color: var(--accent);">-</div>
+      </div>
+    </div>
+
+    <!-- Create License Form -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">إنشاء ترخيص جديد (Create New SaaS License)</div>
+      </div>
+      <form id="createForm" onsubmit="createLicense(event)">
+        <div class="form-grid">
+          <div class="input-group">
+            <label>اسم الزبون / نقطة البيع</label>
+            <input type="text" id="custName" placeholder="مثال: متجر الهواتف الجزائر" required>
+          </div>
+          <div class="input-group">
+            <label>نوع الخطة (Plan)</label>
+            <select id="plan">
+              <option value="MONTHLY">شهرية (30 يوماً)</option>
+              <option value="YEARLY" selected>سنوية (365 يوماً)</option>
+              <option value="LIFETIME">مدى الحياة (Lifetime)</option>
+              <option value="TRIAL">تجريبية (7 أيام)</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>عدد الأجهزة المسموحة (Max Devices)</label>
+            <input type="number" id="maxDev" value="1" min="1" max="10" required>
+          </div>
+          <div class="input-group">
+            <label>المدة بالأيام</label>
+            <input type="number" id="days" value="365" min="1" required>
+          </div>
+        </div>
+        <button type="submit" class="btn">توليد الترخيص الآن</button>
+      </form>
+    </div>
+
+    <!-- Licenses Table -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">قائمة التراخيص الصادرة</div>
+      </div>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>مفتاح الترخيص (License Key)</th>
+              <th>الزبون</th>
+              <th>الخطة</th>
+              <th>الحالة</th>
+              <th>الأجهزة المربوطة</th>
+              <th>تاريخ الانتهاء</th>
+              <th>آخر اتصال</th>
+            </tr>
+          </thead>
+          <tbody id="licensesTableBody">
+            <tr><td colspan="7" style="text-align: center;">جاري تحميل التراخيص...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = '';
+
+    async function loadData() {
+      try {
+        const statsRes = await fetch('/api/admin/stats');
+        const stats = await statsRes.json();
+        document.getElementById('totalLicenses').innerText = stats.total_licenses;
+        document.getElementById('activeLicenses').innerText = stats.active_licenses;
+        document.getElementById('boundDevices').innerText = stats.bound_devices;
+
+        const licRes = await fetch('/api/admin/licenses');
+        const licData = await licRes.json();
+        const tbody = document.getElementById('licensesTableBody');
+        tbody.innerHTML = '';
+
+        if (!licData.licenses || licData.licenses.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">لا توجد تراخيص مسجلة</td></tr>';
+          return;
+        }
+
+        licData.licenses.forEach(lic => {
+          const tr = document.createElement('tr');
+          const isExpired = lic.status === 'EXPIRED';
+          const badgeClass = lic.status === 'ACTIVE' ? 'badge-active' : (lic.plan === 'TRIAL' ? 'badge-trial' : 'badge-expired');
+          
+          tr.innerHTML = `
+            <td><span class="code">${lic.license_id}</span></td>
+            <td><strong>${lic.customer_name || lic.customer_id}</strong></td>
+            <td>${lic.plan}</td>
+            <td><span class="badge ${badgeClass}">${lic.status}</span></td>
+            <td>${lic.active_devices} / ${lic.max_devices}</td>
+            <td>${lic.expiry_date ? lic.expiry_date.split('T')[0] : 'مدى الحياة'}</td>
+            <td>${lic.last_check ? lic.last_check.split('T')[0] : '-'}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error('Error loading data:', err);
+      }
+    }
+
+    async function createLicense(e) {
+      e.preventDefault();
+      const payload = {
+        customer_name: document.getElementById('custName').value,
+        plan: document.getElementById('plan').value,
+        max_devices: parseInt(document.getElementById('maxDev').value),
+        days: parseInt(document.getElementById('days').value),
+      };
+
+      try {
+        const res = await fetch('/api/admin/licenses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (result.success) {
+          alert('تم إنشاء الترخيص بنجاح:\n' + result.license_id);
+          document.getElementById('createForm').reset();
+          loadData();
+        } else {
+          alert('خطأ: ' + result.message);
+        }
+      } catch (err) {
+        alert('فشل الاتصال بالخادم');
+      }
+    }
+
+    window.onload = loadData;
+  </script>
+</body>
+</html>
