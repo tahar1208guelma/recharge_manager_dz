@@ -15,7 +15,6 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.29.0'
           channel: 'stable'
           cache: true
 
@@ -29,15 +28,15 @@ jobs:
         run: |
           Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "windows\installer\vcredist_x64.exe"
 
-      - name: Setup Inno Setup Compiler
-        uses: Min-Shar/setup-innosetup@v1
+      - name: Install Inno Setup Compiler
+        run: choco install innosetup --no-progress -y
 
       - name: Compile Windows Setup (.exe Installer)
         run: |
-          iscc windows\installer\recharge_manager_dz_setup.iss
+          & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" windows\installer\recharge_manager_dz_setup.iss
 
       - name: Upload Windows Setup Artifact (.exe)
         uses: actions/upload-artifact@v4
         with:
-          name: RechargeManagerDZ_v1.0_Windows_Setup.exe
+          name: RechargeManagerDZ_v1.0_Windows_Setup
           path: dist/RechargeManagerDZ_v1.0_Windows_Setup.exe
