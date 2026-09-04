@@ -6,14 +6,13 @@ import '../../core/constants/operator_constants.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../services/operators/ussd_generator.dart';
-import '../../services/printing/receipt_template.dart';
 import '../providers/recharge_provider.dart';
 import '../providers/usb_provider.dart';
 import '../widgets/operator_card.dart';
 import '../widgets/quick_amount_selector.dart';
-import '../widgets/receipt_preview_modal.dart';
 import '../widgets/sim_pin_modal.dart';
 import '../widgets/smart_phone_search_field.dart';
+import '../widgets/interactive_ussd_dialog.dart';
 
 enum RechargeMode { flexyService, directCard }
 
@@ -506,6 +505,27 @@ class _RechargeScreenState extends State<RechargeScreen> {
                               fontSize: 18,
                             ),
                           ),
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              icon: const Icon(Icons.phonelink_ring, size: 16, color: Colors.greenAccent),
+                              label: const Text(
+                                'عرض رسائل الشريحة والخيارات تفاعلياً (Interactive Session)',
+                                style: TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              onPressed: () {
+                                InteractiveUssdDialog.show(
+                                  context,
+                                  operator: recharge.selectedOperator,
+                                  initialUssdCode: liveUssdCode,
+                                  phoneNumber: _phoneController.text.trim(),
+                                  amount: recharge.amount,
+                                  customerName: _nameController.text.trim(),
+                                );
+                              },
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -535,7 +555,7 @@ class _RechargeScreenState extends State<RechargeScreen> {
                         ),
                       ),
 
-                    // Execute Recharge Button
+                    // Execute Recharge Button with Interactive Dialog
                     SizedBox(
                       width: double.infinity,
                       height: 54,
@@ -544,33 +564,29 @@ class _RechargeScreenState extends State<RechargeScreen> {
                           backgroundColor: OperatorConstants.getOperatorColor(recharge.selectedOperator),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
-                        onPressed: recharge.isProcessing
-                            ? null
-                            : () async {
-                                final ok = await recharge.executeRecharge();
-                                if (ok && recharge.lastTransaction != null && mounted) {
-                                  final receipt = ReceiptData.fromTransaction(recharge.lastTransaction!);
-                                  showDialog(
-                                    context: context,
-                                    builder: (_) => ReceiptPreviewModal(receipt: receipt),
-                                  );
-                                }
-                              },
-                        child: recharge.isProcessing
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.flash_on, size: 22),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    _mode == RechargeMode.directCard
-                                        ? 'تأكيد التعبئة بالبطاقة ($liveUssdCode)'
-                                        : '${context.tr('btn_recharge_now')} (${CurrencyFormatter.formatCompact(recharge.amount)})',
-                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
+                        onPressed: () async {
+                          await InteractiveUssdDialog.show(
+                            context,
+                            operator: recharge.selectedOperator,
+                            initialUssdCode: liveUssdCode,
+                            phoneNumber: _phoneController.text.trim(),
+                            amount: recharge.amount,
+                            customerName: _nameController.text.trim(),
+                          );
+                        },
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.flash_on, size: 22),
+                            const SizedBox(width: 10),
+                            Text(
+                              _mode == RechargeMode.directCard
+                                  ? 'تأكيد التعبئة بالبطاقة ($liveUssdCode)'
+                                  : '${context.tr('btn_recharge_now')} (${CurrencyFormatter.formatCompact(recharge.amount)})',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
