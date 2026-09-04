@@ -6,6 +6,7 @@ import '../../core/localization/locale_provider.dart';
 import '../../services/updater/app_update_service.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/app_update_modal.dart';
+import '../widgets/custom_ussd_editor_card.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -45,7 +46,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.all(24),
       child: Center(
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 800),
+          constraints: const BoxConstraints(maxWidth: 850),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -109,6 +110,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 24),
+
+              // Custom USSD Codes Editor (تخصيص وتعديل أكواد الـ USSD للمتعاملين الثلاثة)
+              CustomUssdEditorCard(settings: settings),
               const SizedBox(height: 24),
 
               // Software Updates Center (مركز التحديثات)

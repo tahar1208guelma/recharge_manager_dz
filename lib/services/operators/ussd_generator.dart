@@ -10,7 +10,7 @@ class UssdSubOption {
 class UssdServiceDef {
   final String key;
   final String title;
-  final String template;
+  final String defaultTemplate;
   final List<String> requiredParams;
   final String? subMenuTitle;
   final List<UssdSubOption>? subOptions;
@@ -18,7 +18,7 @@ class UssdServiceDef {
   const UssdServiceDef({
     required this.key,
     required this.title,
-    required this.template,
+    required this.defaultTemplate,
     required this.requiredParams,
     this.subMenuTitle,
     this.subOptions,
@@ -28,18 +28,29 @@ class UssdServiceDef {
 }
 
 class UssdGenerator {
-  static const Map<OperatorType, Map<String, UssdServiceDef>> operatorServices = {
+  /// Default PINs per Algerian Operator
+  static const Map<OperatorType, String> defaultPins = {
+    OperatorType.mobilis: '11111',
+    OperatorType.ooredoo: '0000',
+    OperatorType.djezzy: '00000',
+    OperatorType.unknown: '0000',
+  };
+
+  /// Master list of all operator services with default templates (Mobilis includes 04 account)
+  static Map<OperatorType, Map<String, UssdServiceDef>> get operatorServices => defaultOperatorServices;
+
+  static const Map<OperatorType, Map<String, UssdServiceDef>> defaultOperatorServices = {
     OperatorType.mobilis: {
       'recharge_direct': UssdServiceDef(
         key: 'recharge_direct',
         title: 'تعبئة الرصيد (بطاقة شحن)',
-        template: '*111*{card_code}#',
+        defaultTemplate: '*111*{card_code}#',
         requiredParams: ['card_code'],
       ),
       'arseli_avec_activation': UssdServiceDef(
         key: 'arseli_avec_activation',
         title: '📞 Arseli مع التفعيل',
-        template: '*696*{sub_option}*{receiver}*{amount}*{pin}#',
+        defaultTemplate: '*696*1*{receiver}*04*{amount}*{pin}#',
         requiredParams: ['sub_option', 'receiver', 'amount', 'pin'],
         subMenuTitle: 'اختر نوع Arseli:',
         subOptions: [
@@ -50,32 +61,44 @@ class UssdGenerator {
       ),
       'transfert_flexy': UssdServiceDef(
         key: 'transfert_flexy',
-        title: '💳 تحويل رصيد Flexy',
-        template: '*630*{receiver}*{amount}*{pin}#',
+        title: '💳 تحويل Flexy',
+        defaultTemplate: '*630*{receiver}*04*{amount}*{pin}#',
+        requiredParams: ['receiver', 'amount', 'pin'],
+      ),
+      'arseli_international': UssdServiceDef(
+        key: 'arseli_international',
+        title: '🌍 Arseli دولي / دفع الفاتورة',
+        defaultTemplate: '*633*{receiver}*{amount}*{pin}#',
+        requiredParams: ['receiver', 'amount', 'pin'],
+      ),
+      'transfert_normal': UssdServiceDef(
+        key: 'transfert_normal',
+        title: '💸 تحويل الرصيد (Transfert)',
+        defaultTemplate: '*631*{receiver}*{amount}*{pin}#',
         requiredParams: ['receiver', 'amount', 'pin'],
       ),
       'solde': UssdServiceDef(
         key: 'solde',
-        title: '📊 معرفة الرصيد',
-        template: '*632*01*{pin}#',
+        title: '📊 معرفة الرصيد (Solde)',
+        defaultTemplate: '*632*01*{pin}#',
         requiredParams: ['pin'],
       ),
       'liste_flexy': UssdServiceDef(
         key: 'liste_flexy',
-        title: 'قائمة أرقام Flexy المحولة',
-        template: '*632*03*{pin}#',
+        title: '📋 قائمة أرقام Flexy',
+        defaultTemplate: '*632*03*{pin}#',
         requiredParams: ['pin'],
       ),
       'liste_transferts': UssdServiceDef(
         key: 'liste_transferts',
-        title: 'قائمة آخر عمليات التحويل',
-        template: '*631*01*{pin}#',
+        title: '📋 قائمة التحويلات',
+        defaultTemplate: '*631*01*{pin}#',
         requiredParams: ['pin'],
       ),
       'changer_pin': UssdServiceDef(
         key: 'changer_pin',
-        title: 'تغيير الرمز السري لشريحة Flexy',
-        template: '*632*02*{old_pin}*{new_pin}#',
+        title: '🔑 تغيير الرمز السري (PIN)',
+        defaultTemplate: '*632*02*{old_pin}*{new_pin}#',
         requiredParams: ['old_pin', 'new_pin'],
       ),
     },
@@ -83,13 +106,13 @@ class UssdGenerator {
       'recharge_direct': UssdServiceDef(
         key: 'recharge_direct',
         title: 'تعبئة الرصيد (بطاقة شحن 222)',
-        template: '222',
+        defaultTemplate: '222',
         requiredParams: ['card_code'],
       ),
       'flexy_activation': UssdServiceDef(
         key: 'flexy_activation',
         title: '📞 Flexy مع التفعيل',
-        template: '*585*{sub_option}*{receiver}#',
+        defaultTemplate: '*585*{receiver}#',
         requiredParams: ['sub_option', 'receiver'],
         subMenuTitle: 'اختر نوع تفعيل Flexy:',
         subOptions: [
@@ -101,25 +124,37 @@ class UssdGenerator {
       'transfert_flexy': UssdServiceDef(
         key: 'transfert_flexy',
         title: '💳 تحويل رصيد Flexy',
-        template: '*580*{receiver}*{amount}*{pin}#',
+        defaultTemplate: '*580*{receiver}*{amount}*{pin}#',
         requiredParams: ['receiver', 'amount', 'pin'],
       ),
       'solde_avec_pin': UssdServiceDef(
         key: 'solde_avec_pin',
-        title: 'معرفة الرصيد (باستخدام رمز PIN)',
-        template: '*570*{pin}#',
+        title: '📊 معرفة الرصيد (مع PIN)',
+        defaultTemplate: '*570*{pin}#',
         requiredParams: ['pin'],
       ),
-      'solde_sans_pin': UssdServiceDef(
-        key: 'solde_sans_pin',
-        title: '📊 معرفة الرصيد السريع',
-        template: '*766#',
+      'liste_flexy_avec_pin': UssdServiceDef(
+        key: 'liste_flexy_avec_pin',
+        title: '📋 قائمة أرقام Flexy (مع PIN)',
+        defaultTemplate: '*221*{pin}#',
+        requiredParams: ['pin'],
+      ),
+      'liste_flexy_sans_pin': UssdServiceDef(
+        key: 'liste_flexy_sans_pin',
+        title: '📋 قائمة أرقام Flexy (بدون PIN)',
+        defaultTemplate: '*762#',
         requiredParams: [],
+      ),
+      'transfert_ou_liste': UssdServiceDef(
+        key: 'transfert_ou_liste',
+        title: '💳 تحويل Flexy (بديل)',
+        defaultTemplate: '*660*{receiver}*{amount}*{pin}#',
+        requiredParams: ['receiver', 'amount', 'pin'],
       ),
       'flexy_bonus': UssdServiceDef(
         key: 'flexy_bonus',
-        title: 'Flexy مع مكافأة البونص (Bonus)',
-        template: '*764*{receiver}*{amount}*{pin}#',
+        title: '🎁 Flexy مع مكافأة (Bonus)',
+        defaultTemplate: '*764*{receiver}*{amount}*{pin}#',
         requiredParams: ['receiver', 'amount', 'pin'],
       ),
     },
@@ -127,14 +162,14 @@ class UssdGenerator {
       'recharge_direct': UssdServiceDef(
         key: 'recharge_direct',
         title: 'تعبئة الرصيد (بطاقة شحن)',
-        template: '*700*{card_code}#',
+        defaultTemplate: '*700*{card_code}#',
         requiredParams: ['card_code'],
       ),
       'flexy_activation': UssdServiceDef(
         key: 'flexy_activation',
         title: '📞 Flexy مع التفعيل',
-        template: '*770*{sub_option}*{receiver}*{amount}*00000#',
-        requiredParams: ['sub_option', 'receiver', 'amount'],
+        defaultTemplate: '*770*{sub_option}*{receiver}*{amount}*{pin}#',
+        requiredParams: ['sub_option', 'receiver', 'amount', 'pin'],
         subMenuTitle: 'اختر خدمة Flexy:',
         subOptions: [
           UssdSubOption(key: '1', label: '1. تحويل رصيد (إرسال)'),
@@ -144,24 +179,60 @@ class UssdGenerator {
       ),
       'transfert_flexy': UssdServiceDef(
         key: 'transfert_flexy',
-        title: '💳 تحويل رصيد Flexy العادي',
-        template: '*770*{receiver}*{amount}*00000#',
-        requiredParams: ['receiver', 'amount'],
+        title: '💳 تحويل رصيد عادي',
+        defaultTemplate: '*770*{receiver}*{amount}*{pin}#',
+        requiredParams: ['receiver', 'amount', 'pin'],
       ),
       'solde': UssdServiceDef(
         key: 'solde',
         title: '📊 معرفة الرصيد',
-        template: '*710#',
+        defaultTemplate: '*710#',
         requiredParams: [],
       ),
-      'changer_pin': UssdServiceDef(
-        key: 'changer_pin',
-        title: 'تغيير الرمز السري لشريحة Flexy',
-        template: '*770*{old_pin}*{new_pin}#',
-        requiredParams: ['old_pin', 'new_pin'],
+      'liste_flexy': UssdServiceDef(
+        key: 'liste_flexy',
+        title: '📋 قائمة أرقام Flexy',
+        defaultTemplate: '*777#',
+        requiredParams: [],
+      ),
+      'transfert_alt': UssdServiceDef(
+        key: 'transfert_alt',
+        title: '💳 تحويل رصيد (بديل 00000)',
+        defaultTemplate: '*770*{receiver}*{amount}*00000#',
+        requiredParams: ['receiver', 'amount'],
       ),
     },
   };
+
+  /// In-memory custom templates cache (loaded from settings)
+  static final Map<String, String> _customTemplates = {};
+
+  static void setCustomTemplate(OperatorType operator, String serviceKey, String template) {
+    _customTemplates['${operator.name}_$serviceKey'] = template.trim();
+  }
+
+  static String getEffectiveTemplate(OperatorType operator, String serviceKey) {
+    final customKey = '${operator.name}_$serviceKey';
+    if (_customTemplates.containsKey(customKey) && _customTemplates[customKey]!.isNotEmpty) {
+      return _customTemplates[customKey]!;
+    }
+    final def = defaultOperatorServices[operator]?[serviceKey];
+    return def?.defaultTemplate ?? '';
+  }
+
+  static void loadCustomTemplates(Map<String, String> settingsMap) {
+    _customTemplates.clear();
+    for (final entry in settingsMap.entries) {
+      if (entry.key.startsWith('ussd_tpl_')) {
+        final key = entry.key.replaceFirst('ussd_tpl_', '');
+        _customTemplates[key] = entry.value;
+      }
+    }
+  }
+
+  static void resetAllCustomTemplates() {
+    _customTemplates.clear();
+  }
 
   /// Generates the final USSD execution string with parameters filled in
   static String generate(
@@ -176,15 +247,10 @@ class UssdGenerator {
     String? newPin,
     Map<String, dynamic>? extraParams,
   }) {
-    final services = operatorServices[operator];
-    if (services == null) return '';
+    String result = getEffectiveTemplate(operator, serviceKey);
+    if (result.isEmpty) return '';
 
-    final def = services[serviceKey];
-    if (def == null) return '';
-
-    String result = def.template;
-
-    const defaultPin = '0000';
+    final defaultPin = defaultPins[operator] ?? '0000';
     final effectivePin = (pin != null && pin.trim().isNotEmpty) ? pin.trim() : defaultPin;
 
     if (cardCode != null) {

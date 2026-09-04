@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/operator_constants.dart';
 import '../../domain/repositories/settings_repository.dart';
+import '../../services/operators/ussd_generator.dart';
 
 class SettingsProvider extends ChangeNotifier {
   final SettingsRepository repository;
@@ -11,6 +13,12 @@ class SettingsProvider extends ChangeNotifier {
   bool _mockMode = true;
   ThemeMode _themeMode = ThemeMode.light;
 
+  final Map<OperatorType, String> _operatorPins = {
+    OperatorType.mobilis: '11111',
+    OperatorType.ooredoo: '0000',
+    OperatorType.djezzy: '00000',
+  };
+
   SettingsProvider({required this.repository});
 
   String get storeName => _storeName;
@@ -18,6 +26,8 @@ class SettingsProvider extends ChangeNotifier {
   String get storePhone => _storePhone;
   bool get mockMode => _mockMode;
   ThemeMode get themeMode => _themeMode;
+
+  String getOperatorPin(OperatorType op) => _operatorPins[op] ?? UssdGenerator.defaultPins[op] ?? '0000';
 
   Future<void> initialize() async {
     final settings = await repository.getAllSettings();
@@ -31,6 +41,15 @@ class SettingsProvider extends ChangeNotifier {
       if (mode == 'light') _themeMode = ThemeMode.light;
       if (mode == 'system') _themeMode = ThemeMode.system;
     }
+
+    // Load operator PINs
+    if (settings.containsKey('pin_mobilis')) _operatorPins[OperatorType.mobilis] = settings['pin_mobilis']!;
+    if (settings.containsKey('pin_ooredoo')) _operatorPins[OperatorType.ooredoo] = settings['pin_ooredoo']!;
+    if (settings.containsKey('pin_djezzy')) _operatorPins[OperatorType.djezzy] = settings['pin_djezzy']!;
+
+    // Load custom USSD templates into UssdGenerator
+    UssdGenerator.loadCustomTemplates(settings);
+
     notifyListeners();
   }
 
@@ -45,6 +64,28 @@ class SettingsProvider extends ChangeNotifier {
     await repository.setSetting('store_name', name);
     await repository.setSetting('store_address', address);
     await repository.setSetting('store_phone', phone);
+    notifyListeners();
+  }
+
+  Future<void> setOperatorPin(OperatorType op, String pin) async {
+    _operatorPins[op] = pin.trim();
+    await repository.setSetting('pin_${op.name}', pin.trim());
+    notifyListeners();
+  }
+
+  Future<void> saveCustomUssdTemplate(OperatorType op, String serviceKey, String template) async {
+    UssdGenerator.setCustomTemplate(op, serviceKey, template);
+    await repository.setSetting('ussd_tpl_${op.name}_$serviceKey', template.trim());
+    notifyListeners();
+  }
+
+  Future<void> resetOperatorUssdTemplates(OperatorType op) async {
+    final defs = UssdGenerator.defaultOperatorServices[op] ?? {};
+    for (final entry in defs.entries) {
+      final customKey = 'ussd_tpl_${op.name}_${entry.key}';
+      await repository.deleteSetting(customKey);
+      UssdGenerator.setCustomTemplate(op, entry.key, entry.value.defaultTemplate);
+    }
     notifyListeners();
   }
 

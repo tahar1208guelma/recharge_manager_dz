@@ -3,7 +3,11 @@ import 'package:recharge_manager_dz/core/constants/operator_constants.dart';
 import 'package:recharge_manager_dz/services/operators/ussd_generator.dart';
 
 void main() {
-  group('Mobilis USSD Code Generation Tests', () {
+  setUp(() {
+    UssdGenerator.resetAllCustomTemplates();
+  });
+
+  group('Mobilis Corrected USSD Code Tests (Account 04 & PIN 11111)', () {
     test('Should generate Mobilis Direct Card recharge (*111*)', () {
       final code = UssdGenerator.generate(
         OperatorType.mobilis,
@@ -13,52 +17,47 @@ void main() {
       expect(code, '*111*12345678901234#');
     });
 
-    test('Should generate Mobilis Flexy USSD code', () {
+    test('Should generate Mobilis Flexy with account 04 and default PIN 11111', () {
       final code = UssdGenerator.generate(
         OperatorType.mobilis,
         'transfert_flexy',
         receiver: '0661123456',
         amount: 500,
-        pin: '0000',
       );
-      expect(code, '*630*0661123456*500*0000#');
+      expect(code, '*630*0661123456*04*500*11111#');
     });
 
-    test('Should generate Mobilis Arseli with Sub-menu option 1 (Local)', () {
+    test('Should generate Mobilis Arseli with account 04, sub-option 1, and default PIN 11111', () {
       final code = UssdGenerator.generate(
         OperatorType.mobilis,
         'arseli_avec_activation',
         receiver: '0661123456',
         amount: 1000,
-        pin: '0000',
         subOption: '1',
       );
-      expect(code, '*696*1*0661123456*1000*0000#');
+      expect(code, '*696*1*0661123456*04*1000*11111#');
     });
 
-    test('Should generate Mobilis Arseli with Sub-menu option 2 (International)', () {
+    test('Should generate Mobilis Arseli International without extra 1*', () {
       final code = UssdGenerator.generate(
         OperatorType.mobilis,
-        'arseli_avec_activation',
+        'arseli_international',
         receiver: '0661123456',
         amount: 2000,
-        pin: '1234',
-        subOption: '2',
       );
-      expect(code, '*696*2*0661123456*2000*1234#');
+      expect(code, '*633*0661123456*2000*11111#');
     });
 
-    test('Should generate Mobilis Solde USSD code', () {
+    test('Should generate Mobilis Solde with default PIN 11111', () {
       final code = UssdGenerator.generate(
         OperatorType.mobilis,
         'solde',
-        pin: '0000',
       );
-      expect(code, '*632*01*0000#');
+      expect(code, '*632*01*11111#');
     });
   });
 
-  group('Ooredoo USSD Code Generation Tests', () {
+  group('Ooredoo Corrected USSD Code Tests (PIN 0000)', () {
     test('Should generate Ooredoo Direct Card recharge (222)', () {
       final code = UssdGenerator.generate(
         OperatorType.ooredoo,
@@ -68,37 +67,27 @@ void main() {
       expect(code, '222');
     });
 
-    test('Should generate Ooredoo Flexy USSD code', () {
+    test('Should generate Ooredoo Flexy with default PIN 0000', () {
       final code = UssdGenerator.generate(
         OperatorType.ooredoo,
         'transfert_flexy',
         receiver: '0555432100',
         amount: 200,
-        pin: '0000',
       );
       expect(code, '*580*0555432100*200*0000#');
     });
 
-    test('Should generate Ooredoo Flexy with Sub-menu Activation option 1', () {
+    test('Should generate Ooredoo Flexy activation (*585*)', () {
       final code = UssdGenerator.generate(
         OperatorType.ooredoo,
         'flexy_activation',
         receiver: '0555432100',
-        subOption: '1',
       );
-      expect(code, '*585*1*0555432100#');
-    });
-
-    test('Should generate Ooredoo Solde without PIN USSD code', () {
-      final code = UssdGenerator.generate(
-        OperatorType.ooredoo,
-        'solde_sans_pin',
-      );
-      expect(code, '*766#');
+      expect(code, '*585*0555432100#');
     });
   });
 
-  group('Djezzy USSD Code Generation Tests', () {
+  group('Djezzy Corrected USSD Code Tests (PIN 00000)', () {
     test('Should generate Djezzy Direct Card recharge (*700*)', () {
       final code = UssdGenerator.generate(
         OperatorType.djezzy,
@@ -108,7 +97,7 @@ void main() {
       expect(code, '*700*98765432101234#');
     });
 
-    test('Should generate Djezzy Flexy with Sub-menu option 1', () {
+    test('Should generate Djezzy Flexy with sub-option and default PIN 00000', () {
       final code = UssdGenerator.generate(
         OperatorType.djezzy,
         'flexy_activation',
@@ -125,6 +114,24 @@ void main() {
         'solde',
       );
       expect(code, '*710#');
+    });
+  });
+
+  group('Custom USSD Template Overriding Tests', () {
+    test('Should allow overriding USSD templates dynamically', () {
+      UssdGenerator.setCustomTemplate(
+        OperatorType.mobilis,
+        'transfert_flexy',
+        '*600*{receiver}*{amount}*{pin}#',
+      );
+
+      final code = UssdGenerator.generate(
+        OperatorType.mobilis,
+        'transfert_flexy',
+        receiver: '0661123456',
+        amount: 500,
+      );
+      expect(code, '*600*0661123456*500*11111#');
     });
   });
 }
