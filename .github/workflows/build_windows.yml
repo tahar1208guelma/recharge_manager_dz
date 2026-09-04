@@ -1,4 +1,4 @@
-name: Build Windows Release (.exe)
+name: Multi-Platform Build & Release (Windows, Android, macOS)
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
 
 jobs:
   build-windows:
+    name: Build Windows (.exe)
     runs-on: windows-latest
     steps:
       - name: Checkout Repository
@@ -35,8 +36,67 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" windows\installer\recharge_manager_dz_setup.iss
 
-      - name: Upload Windows Setup Artifact (.exe)
+      - name: Upload Windows Setup (.exe)
         uses: actions/upload-artifact@v4
         with:
           name: RechargeManagerDZ_v1.0_Windows_Setup
           path: dist/RechargeManagerDZ_v1.0_Windows_Setup.exe
+
+  build-android:
+    name: Build Android (.apk)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Android APK
+        run: flutter build apk --release
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RechargeManagerDZ_v1.0_Android_APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  build-macos:
+    name: Build macOS Application
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build macOS App
+        run: |
+          flutter build macos --release
+          cd build/macos/Build/Products/Release
+          zip -r RechargeManagerDZ_macOS.zip recharge_manager_dz.app
+
+      - name: Upload macOS Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: RechargeManagerDZ_v1.0_macOS
+          path: build/macos/Build/Products/Release/RechargeManagerDZ_macOS.zip

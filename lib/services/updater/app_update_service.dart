@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../core/utils/app_logger.dart';
 
@@ -26,9 +28,9 @@ class AppUpdateService {
   static const String currentAppVersion = '1.0.0';
   static const String githubRepo = 'tahar1208guelma/recharge_manager_dz';
 
-  /// Checks GitHub Releases API for new versions
+  /// Checks GitHub Releases API for new versions tailored to the current platform
   static Future<AppUpdateInfo> checkForUpdates() async {
-    AppLogger.info('Checking for software updates from GitHub Releases...');
+    AppLogger.info('Checking for software updates from GitHub Releases (Platform: ${kIsWeb ? 'Web' : Platform.operatingSystem})...');
 
     try {
       final url = Uri.parse('https://api.github.com/repos/$githubRepo/releases/latest');
@@ -49,17 +51,35 @@ class AppUpdateService {
 
         String? downloadUrl;
         final assets = data['assets'] as List<dynamic>?;
+
         if (assets != null && assets.isNotEmpty) {
+          // Detect platform-specific file extension
+          String targetExt = '.exe';
+          if (!kIsWeb) {
+            if (Platform.isAndroid) {
+              targetExt = '.apk';
+            } else if (Platform.isMacOS) {
+              targetExt = 'macos';
+            } else if (Platform.isWindows) {
+              targetExt = '.exe';
+            }
+          }
+
           for (final asset in assets) {
             final name = asset['name']?.toString().toLowerCase() ?? '';
-            if (name.endsWith('.exe') || name.endsWith('.apk') || name.endsWith('.zip')) {
+            if (name.contains(targetExt) || name.endsWith(targetExt)) {
               downloadUrl = asset['browser_download_url']?.toString();
               break;
             }
           }
-        }
-        downloadUrl ??= data['html_url']?.toString();
 
+          // Fallback to first available asset if specific extension not matched
+          if (downloadUrl == null && assets.isNotEmpty) {
+            downloadUrl = assets.first['browser_download_url']?.toString();
+          }
+        }
+
+        downloadUrl ??= data['html_url']?.toString();
         final hasUpdate = _isVersionNewer(cleanLatest, currentAppVersion);
 
         return AppUpdateInfo(
