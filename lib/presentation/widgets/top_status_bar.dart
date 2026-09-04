@@ -10,6 +10,7 @@ import '../providers/license_provider.dart';
 import '../providers/recharge_provider.dart';
 import '../providers/usb_provider.dart';
 import 'reader_device_info_modal.dart';
+import 'sim_pin_modal.dart';
 
 class TopStatusBar extends StatelessWidget {
   const TopStatusBar({super.key});
@@ -36,6 +37,32 @@ class TopStatusBar extends StatelessWidget {
             onTap: () => ReaderDeviceInfoModal.show(context, usb),
             borderRadius: BorderRadius.circular(20),
             child: _buildUsbStatus(context, usb),
+          ),
+          const SizedBox(width: 10),
+
+          // SIM PIN Quick Action Badge
+          InkWell(
+            onTap: () => SimPinModal.show(context, usb),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.lightCard,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.borderLight),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.key, color: AppColors.primary, size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    'PIN: ${usb.simPin}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, fontFamily: 'monospace'),
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(width: 16),
 

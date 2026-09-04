@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/constants/operator_constants.dart';
+import '../../services/operators/ussd_generator.dart';
 import '../../services/smart_card/card_info.dart';
 import '../../services/smart_card/platforms/mock_smart_card_service.dart';
 import '../../services/smart_card/reader_device_info.dart';
@@ -13,10 +14,12 @@ class UsbProvider extends ChangeNotifier {
   StreamSubscription<SmartCardReaderState>? _subscription;
   SmartCardReaderState _state;
   List<ReaderDeviceInfo> _availableReaders = [];
+  String _simPin = '0000';
+  String? _lastExecutedUssd;
 
   UsbProvider({SmartCardService? service})
-      : _service = service ?? SmartCardServiceFactory.create(forceMock: true),
-        _state = (service ?? SmartCardServiceFactory.create(forceMock: true)).currentState {
+      : _service = service ?? SmartCardServiceFactory.create(),
+        _state = (service ?? SmartCardServiceFactory.create()).currentState {
     _subscription = _service.stateStream.listen((newState) {
       _state = newState;
       notifyListeners();
@@ -36,6 +39,15 @@ class UsbProvider extends ChangeNotifier {
   OperatorType get detectedOperator => _state.detectedOperator;
   String? get errorMessage => _state.errorMessage;
   List<ReaderDeviceInfo> get availableReaders => _availableReaders;
+  String get simPin => _simPin;
+  String? get lastExecutedUssd => _lastExecutedUssd;
+
+  void setSimPin(String pin) {
+    if (pin.trim().isNotEmpty) {
+      _simPin = pin.trim();
+      notifyListeners();
+    }
+  }
 
   Future<void> initialize() async {
     await _service.initialize();
@@ -66,6 +78,28 @@ class UsbProvider extends ChangeNotifier {
     final info = await _service.getCardInfo();
     notifyListeners();
     return info;
+  }
+
+  String buildUssdCommand(
+    OperatorType operator,
+    String serviceKey, {
+    String? receiver,
+    double? amount,
+    String? cardCode,
+    String? subOption,
+  }) {
+    final code = UssdGenerator.generate(
+      operator,
+      serviceKey,
+      receiver: receiver,
+      amount: amount,
+      pin: _simPin,
+      cardCode: cardCode,
+      subOption: subOption,
+    );
+    _lastExecutedUssd = code;
+    notifyListeners();
+    return code;
   }
 
   Future<void> simulateInsertSimCard(OperatorType operator) async {

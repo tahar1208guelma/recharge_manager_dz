@@ -1,55 +1,62 @@
 import '../../core/constants/operator_constants.dart';
 
+class UssdSubOption {
+  final String key;
+  final String label;
+
+  const UssdSubOption({required this.key, required this.label});
+}
+
 class UssdServiceDef {
   final String key;
   final String title;
   final String template;
   final List<String> requiredParams;
+  final String? subMenuTitle;
+  final List<UssdSubOption>? subOptions;
 
   const UssdServiceDef({
     required this.key,
     required this.title,
     required this.template,
     required this.requiredParams,
+    this.subMenuTitle,
+    this.subOptions,
   });
+
+  bool get hasSubMenu => subOptions != null && subOptions!.isNotEmpty;
 }
 
 class UssdGenerator {
   static const Map<OperatorType, Map<String, UssdServiceDef>> operatorServices = {
     OperatorType.mobilis: {
-      'transfert_flexy': UssdServiceDef(
-        key: 'transfert_flexy',
-        title: 'تحويل رصيد Flexy (رصيد عادي)',
-        template: '*630*{receiver}*{amount}*{pin}#',
-        requiredParams: ['receiver', 'amount', 'pin'],
+      'recharge_direct': UssdServiceDef(
+        key: 'recharge_direct',
+        title: 'تعبئة الرصيد (بطاقة شحن)',
+        template: '*111*{card_code}#',
+        requiredParams: ['card_code'],
       ),
       'arseli_avec_activation': UssdServiceDef(
         key: 'arseli_avec_activation',
-        title: 'Arseli مع التفعيل (عروض ومكالمات)',
-        template: '*696*1*{receiver}*{amount}*{pin}#',
-        requiredParams: ['receiver', 'amount', 'pin'],
+        title: '📞 Arseli مع التفعيل',
+        template: '*696*{sub_option}*{receiver}*{amount}*{pin}#',
+        requiredParams: ['sub_option', 'receiver', 'amount', 'pin'],
+        subMenuTitle: 'اختر نوع Arseli:',
+        subOptions: [
+          UssdSubOption(key: '1', label: '1. محلي (Local)'),
+          UssdSubOption(key: '2', label: '2. دولي (International)'),
+          UssdSubOption(key: '3', label: '3. استشارة الرصيد'),
+        ],
       ),
-      'arseli_international': UssdServiceDef(
-        key: 'arseli_international',
-        title: 'Arseli دولي (المكالمات الدولية)',
-        template: '*633*1*{receiver}*{amount}*{pin}#',
-        requiredParams: ['receiver', 'amount', 'pin'],
-      ),
-      'paiement_facture': UssdServiceDef(
-        key: 'paiement_facture',
-        title: 'دفع فاتورة Mobilis للمشترك',
-        template: '*633*{receiver}*{amount}*{pin}#',
-        requiredParams: ['receiver', 'amount', 'pin'],
-      ),
-      'transfert_normal': UssdServiceDef(
-        key: 'transfert_normal',
-        title: 'تحويل رصيد عادي (Transfert)',
-        template: '*631*{receiver}*{amount}*{pin}#',
+      'transfert_flexy': UssdServiceDef(
+        key: 'transfert_flexy',
+        title: '💳 تحويل رصيد Flexy',
+        template: '*630*{receiver}*{amount}*{pin}#',
         requiredParams: ['receiver', 'amount', 'pin'],
       ),
       'solde': UssdServiceDef(
         key: 'solde',
-        title: 'معرفة الرصيد المتوفر في الشريحة',
+        title: '📊 معرفة الرصيد',
         template: '*632*01*{pin}#',
         requiredParams: ['pin'],
       ),
@@ -73,17 +80,29 @@ class UssdGenerator {
       ),
     },
     OperatorType.ooredoo: {
-      'transfert_flexy': UssdServiceDef(
-        key: 'transfert_flexy',
-        title: 'تحويل رصيد Flexy (عادي)',
-        template: '*580*{receiver}*{amount}*{pin}#',
-        requiredParams: ['receiver', 'amount', 'pin'],
+      'recharge_direct': UssdServiceDef(
+        key: 'recharge_direct',
+        title: 'تعبئة الرصيد (بطاقة شحن 222)',
+        template: '222',
+        requiredParams: ['card_code'],
       ),
       'flexy_activation': UssdServiceDef(
         key: 'flexy_activation',
-        title: 'Flexy مع التفعيل المباشر للباقة',
-        template: '*585*{receiver}#',
-        requiredParams: ['receiver'],
+        title: '📞 Flexy مع التفعيل',
+        template: '*585*{sub_option}*{receiver}#',
+        requiredParams: ['sub_option', 'receiver'],
+        subMenuTitle: 'اختر نوع تفعيل Flexy:',
+        subOptions: [
+          UssdSubOption(key: '1', label: '1. تفعيل برقم هاتف'),
+          UssdSubOption(key: '2', label: '2. إلغاء التفعيل'),
+          UssdSubOption(key: '3', label: '3. قائمة الأرقام المفعلة'),
+        ],
+      ),
+      'transfert_flexy': UssdServiceDef(
+        key: 'transfert_flexy',
+        title: '💳 تحويل رصيد Flexy',
+        template: '*580*{receiver}*{amount}*{pin}#',
+        requiredParams: ['receiver', 'amount', 'pin'],
       ),
       'solde_avec_pin': UssdServiceDef(
         key: 'solde_avec_pin',
@@ -93,27 +112,9 @@ class UssdGenerator {
       ),
       'solde_sans_pin': UssdServiceDef(
         key: 'solde_sans_pin',
-        title: 'معرفة الرصيد السريع (بدون PIN)',
+        title: '📊 معرفة الرصيد السريع',
         template: '*766#',
         requiredParams: [],
-      ),
-      'liste_flexy_avec_pin': UssdServiceDef(
-        key: 'liste_flexy_avec_pin',
-        title: 'قائمة أرقام Flexy (باستخدام PIN)',
-        template: '*221*{pin}#',
-        requiredParams: ['pin'],
-      ),
-      'liste_flexy_sans_pin': UssdServiceDef(
-        key: 'liste_flexy_sans_pin',
-        title: 'قائمة أرقام Flexy (بدون PIN)',
-        template: '*762#',
-        requiredParams: [],
-      ),
-      'transfert_ou_liste': UssdServiceDef(
-        key: 'transfert_ou_liste',
-        title: 'تحويل رصيد إضافي / عروض خاصة',
-        template: '*660*{receiver}*{amount}*{pin}#',
-        requiredParams: ['receiver', 'amount', 'pin'],
       ),
       'flexy_bonus': UssdServiceDef(
         key: 'flexy_bonus',
@@ -123,28 +124,34 @@ class UssdGenerator {
       ),
     },
     OperatorType.djezzy: {
+      'recharge_direct': UssdServiceDef(
+        key: 'recharge_direct',
+        title: 'تعبئة الرصيد (بطاقة شحن)',
+        template: '*700*{card_code}#',
+        requiredParams: ['card_code'],
+      ),
+      'flexy_activation': UssdServiceDef(
+        key: 'flexy_activation',
+        title: '📞 Flexy مع التفعيل',
+        template: '*770*{sub_option}*{receiver}*{amount}*00000#',
+        requiredParams: ['sub_option', 'receiver', 'amount'],
+        subMenuTitle: 'اختر خدمة Flexy:',
+        subOptions: [
+          UssdSubOption(key: '1', label: '1. تحويل رصيد (إرسال)'),
+          UssdSubOption(key: '2', label: '2. تفعيل رقم Flexy جديد'),
+          UssdSubOption(key: '3', label: '3. قائمة الأرقام المقيدة'),
+        ],
+      ),
       'transfert_flexy': UssdServiceDef(
         key: 'transfert_flexy',
-        title: 'تحويل رصيد Flexy العادي',
-        template: '*770*{receiver}*{amount}*{pin}#',
-        requiredParams: ['receiver', 'amount', 'pin'],
+        title: '💳 تحويل رصيد Flexy العادي',
+        template: '*770*{receiver}*{amount}*00000#',
+        requiredParams: ['receiver', 'amount'],
       ),
       'solde': UssdServiceDef(
         key: 'solde',
-        title: 'معرفة الرصيد المتوفر في الشريحة',
-        template: '*777*{pin}#',
-        requiredParams: ['pin'],
-      ),
-      'solde_rapide': UssdServiceDef(
-        key: 'solde_rapide',
-        title: 'معرفة الرصيد السريع',
-        template: '*777#',
-        requiredParams: [],
-      ),
-      'historique': UssdServiceDef(
-        key: 'historique',
-        title: 'قائمة وسجل آخر المعاملات',
-        template: '*770*1#',
+        title: '📊 معرفة الرصيد',
+        template: '*710#',
         requiredParams: [],
       ),
       'changer_pin': UssdServiceDef(
@@ -163,6 +170,8 @@ class UssdGenerator {
     String? receiver,
     double? amount,
     String? pin,
+    String? cardCode,
+    String? subOption,
     String? oldPin,
     String? newPin,
     Map<String, dynamic>? extraParams,
@@ -177,6 +186,16 @@ class UssdGenerator {
 
     const defaultPin = '0000';
     final effectivePin = (pin != null && pin.trim().isNotEmpty) ? pin.trim() : defaultPin;
+
+    if (cardCode != null) {
+      result = result.replaceAll('{card_code}', cardCode.trim());
+    }
+
+    if (subOption != null && subOption.trim().isNotEmpty) {
+      result = result.replaceAll('{sub_option}', subOption.trim());
+    } else {
+      result = result.replaceAll('{sub_option}', '1');
+    }
 
     if (receiver != null) {
       final cleanReceiver = receiver.replaceAll(RegExp(r'[^0-9]'), '');
