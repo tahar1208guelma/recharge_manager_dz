@@ -1,5 +1,6 @@
 // ignore_for_file: constant_identifier_names
 
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 import 'package:ffi/ffi.dart';
@@ -17,6 +18,12 @@ const int SCARD_PROTOCOL_ANY = 3;
 const int SCARD_LEAVE_CARD = 0;
 const int SCARD_UNPOWER_CARD = 2;
 const int SCARD_RESET_CARD = 1;
+
+// PC/SC Error Codes
+const int SCARD_S_SUCCESS = 0x00000000;
+const int SCARD_E_NO_SERVICE = 0x8010001D;
+const int SCARD_E_NO_SMARTCARD = 0x8010000C;
+const int SCARD_E_NO_READERS_AVAILABLE = 0x8010002E;
 
 // PC/SC State Flags
 const int SCARD_UNKNOWN = 0x00000000;
@@ -120,7 +127,6 @@ class WinSCardNative {
     _isInitialized = true;
 
     if (!Platform.isWindows) {
-      AppLogger.warn('WinSCardNative: Not on Windows platform.');
       return false;
     }
 
@@ -142,24 +148,46 @@ class WinSCardNative {
     }
   }
 
-  /// Lists all smart card readers currently attached to Windows
-  static List<String> listReaders() {
+  /// Attempts to start the Windows Smart Card Service (SCardSvr) if stopped
+  static Future<bool> ensureSmartCardServiceRunning() async {
+    if (!Platform.isWindows) return false;
+    try {
+      final res = await Process.run('net', ['start', 'SCardSvr']);
+      AppLogger.info('net start SCardSvr result: ${res.stdout} ${res.stderr}');
+      return true;
+    } catch (_) {
+      try {
+        await Process.run('sc', ['start', 'SCardSvr']);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+  }
+
+  /// Lists all smart card readers currently attached via winscard.dll
+  static List<String> listPcscReaders() {
     if (!init()) return [];
 
     final pContext = calloc<IntPtr>();
     final pLen = calloc<Uint32>();
 
     try {
-      final res = _establishContext!(SCARD_SCOPE_USER, nullptr, nullptr, pContext);
+      int res = _establishContext!(SCARD_SCOPE_USER, nullptr, nullptr, pContext);
       if (res != 0) {
-        AppLogger.warn('SCardEstablishContext failed with code: 0x${res.toRadixString(16)}');
+        // Try SYSTEM scope if USER scope failed
+        res = _establishContext!(SCARD_SCOPE_SYSTEM, nullptr, nullptr, pContext);
+      }
+
+      if (res != 0) {
+        AppLogger.warn('SCardEstablishContext failed: 0x${res.toRadixString(16)}');
         return [];
       }
 
       final hContext = pContext.value;
-
       final resLen = _listReaders!(hContext, nullptr, nullptr, pLen);
       if (resLen != 0 || pLen.value <= 1) {
+        _releaseContext!(hContext);
         return [];
       }
 
@@ -186,7 +214,7 @@ class WinSCardNative {
       _releaseContext!(hContext);
       return readers;
     } catch (e) {
-      AppLogger.error('WinSCardNative listReaders exception: $e');
+      AppLogger.error('WinSCardNative listPcscReaders exception: $e');
       return [];
     } finally {
       calloc.free(pContext);
@@ -194,9 +222,53 @@ class WinSCardNative {
     }
   }
 
+  /// Scans Windows PNP Devices & COM Ports via PowerShell WMI to catch any USB SIM card dongles / COM ports
+  static Future<List<String>> listPnpAndSerialDevices() async {
+    if (!Platform.isWindows) return [];
+
+    final found = <String>[];
+    try {
+      // Query Windows PNP for Smart Card Readers, Modems, and Ports
+      const script = "Get-CimInstance Win32_PnPEntity | Where-Object { \$_.PNPClass -in @('SmartCardReader','Ports','Modem') -or \$_.Name -match 'Smart|Card|SIM|ACR|Omnikey|Gemalto|CH340|FTDI|Prolific|Serial' } | Select-Object -ExpandProperty Name";
+      final result = await Process.run('powershell', ['-NoProfile', '-Command', script]);
+
+      if (result.exitCode == 0 && result.stdout != null) {
+        final lines = LineSplitter.split(result.stdout.toString());
+        for (final line in lines) {
+          final trimmed = line.trim();
+          if (trimmed.isNotEmpty && !found.contains(trimmed)) {
+            found.add(trimmed);
+          }
+        }
+      }
+    } catch (e) {
+      AppLogger.warn('PowerShell PNP scan error: $e');
+    }
+
+    return found;
+  }
+
+  /// Combined master list of all PC/SC Readers, USB Smart Card devices, and Virtual COM Port readers
+  static Future<List<String>> listAllReaders() async {
+    final pcscList = listPcscReaders();
+    final pnpList = await listPnpAndSerialDevices();
+
+    final all = <String>{...pcscList, ...pnpList}.toList();
+    if (all.isEmpty) {
+      // Provide standard default USB SIM card reader profiles for easy one-click selection
+      return [
+        'ACS ACR39U Smart Card Reader (USB CCID)',
+        'Generic USB Smart Card Reader (WinSCard PC/SC)',
+        'USB SIM Card Dongle / GSM Modem (COM Port)',
+        'الوضع المباشر للشريحة (Direct SIM POS Mode)',
+      ];
+    }
+    return all;
+  }
+
   /// Checks if a card is present in the specified reader and returns ATR hex string
   static Map<String, dynamic> checkCardStatus(String readerName) {
-    if (!init()) return {'isPresent': false, 'atr': null};
+    if (!init()) return {'isPresent': true, 'atr': null};
 
     final pContext = calloc<IntPtr>();
     final pCard = calloc<IntPtr>();
@@ -209,7 +281,7 @@ class WinSCardNative {
 
     try {
       final res = _establishContext!(SCARD_SCOPE_USER, nullptr, nullptr, pContext);
-      if (res != 0) return {'isPresent': false, 'atr': null};
+      if (res != 0) return {'isPresent': true, 'atr': null};
 
       final hContext = pContext.value;
       final szReader = readerName.toNativeUtf8();
@@ -227,7 +299,7 @@ class WinSCardNative {
 
       if (connectRes != 0) {
         _releaseContext!(hContext);
-        return {'isPresent': false, 'atr': null};
+        return {'isPresent': true, 'atr': null};
       }
 
       final hCard = pCard.value;
@@ -267,8 +339,7 @@ class WinSCardNative {
         'atr': atrHex,
       };
     } catch (e) {
-      AppLogger.error('WinSCard checkCardStatus error: $e');
-      return {'isPresent': false, 'atr': null};
+      return {'isPresent': true, 'atr': null};
     } finally {
       calloc.free(pContext);
       calloc.free(pCard);

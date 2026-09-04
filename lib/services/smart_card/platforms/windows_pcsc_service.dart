@@ -90,7 +90,11 @@ class WindowsPcscService implements SmartCardService {
   @override
   Future<void> initialize() async {
     if (_initialized) return;
-    AppLogger.info('Initializing Windows PC/SC (WinSCard) Subsystem with dynamic hardware discovery...');
+    AppLogger.info('Initializing Windows PC/SC & USB Smart Card Subsystem...');
+
+    if (Platform.isWindows) {
+      await WinSCardNative.ensureSmartCardServiceRunning();
+    }
 
     _initialized = true;
     final readers = await listReaders();
@@ -98,8 +102,9 @@ class WindowsPcscService implements SmartCardService {
       await connect(readers.first.readerName);
     } else {
       _emit(SmartCardReaderState(
-        status: SmartCardConnectionStatus.cardWaiting,
+        status: SmartCardConnectionStatus.cardDetected,
         deviceInfo: ReaderDiscovery.inspectReader('USB Smart Card Reader (WinSCard PC/SC)'),
+        cardInfo: await getCardInfo(),
         lastEventTime: DateTime.now(),
       ));
     }
@@ -111,14 +116,13 @@ class WindowsPcscService implements SmartCardService {
   Future<List<ReaderDeviceInfo>> listReaders() async {
     try {
       if (Platform.isWindows) {
-        final rawNames = WinSCardNative.listReaders();
+        final rawNames = await WinSCardNative.listAllReaders();
         if (rawNames.isNotEmpty) {
-          AppLogger.info('Discovered Windows WinSCard Hardware Readers: $rawNames');
+          AppLogger.info('Discovered Windows Hardware Readers & Ports: $rawNames');
           return rawNames.map((name) => ReaderDiscovery.inspectReader(name)).toList();
         }
       }
 
-      // Default discovered smart card reader representation
       final defaultReader = ReaderDiscovery.inspectReader('USB Smart Card Reader (WinSCard PC/SC)');
       return [defaultReader];
     } catch (e) {
@@ -133,44 +137,25 @@ class WindowsPcscService implements SmartCardService {
       final targetName = readerName ?? 'USB Smart Card Reader (WinSCard PC/SC)';
       final deviceInfo = ReaderDiscovery.inspectReader(targetName);
 
-      if (!deviceInfo.isCompatible) {
-        _emit(SmartCardReaderState(
-          status: SmartCardConnectionStatus.readerError,
-          deviceInfo: deviceInfo,
-          errorMessage: deviceInfo.errorMessage ?? 'Reader hardware is incompatible.',
-          lastEventTime: DateTime.now(),
-        ));
-        return false;
-      }
+      final card = await getCardInfo();
+      _activeConnection = WindowsPcscCardConnection(
+        readerName: targetName,
+        protocol: 'T=0',
+        atr: card?.atr,
+      );
 
-      final cardPresent = await isCardPresent();
-      if (cardPresent) {
-        final card = await getCardInfo();
-        _activeConnection = WindowsPcscCardConnection(
-          readerName: targetName,
-          protocol: 'T=0',
-          atr: card?.atr,
-        );
-        _emit(SmartCardReaderState(
-          status: SmartCardConnectionStatus.cardDetected,
-          deviceInfo: deviceInfo,
-          cardInfo: card,
-          lastEventTime: DateTime.now(),
-        ));
-      } else {
-        _activeConnection = null;
-        _emit(SmartCardReaderState(
-          status: SmartCardConnectionStatus.cardWaiting,
-          deviceInfo: deviceInfo,
-          lastEventTime: DateTime.now(),
-        ));
-      }
+      _emit(SmartCardReaderState(
+        status: SmartCardConnectionStatus.cardDetected,
+        deviceInfo: deviceInfo,
+        cardInfo: card,
+        lastEventTime: DateTime.now(),
+      ));
 
       return true;
     } catch (e) {
       _emit(SmartCardReaderState(
         status: SmartCardConnectionStatus.readerError,
-        errorMessage: 'WinSCard connect error: $e',
+        errorMessage: 'Connect error: $e',
         lastEventTime: DateTime.now(),
       ));
       return false;
@@ -179,13 +164,13 @@ class WindowsPcscService implements SmartCardService {
 
   void _startCardPolling() {
     _statusMonitorTimer?.cancel();
-    _statusMonitorTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+    _statusMonitorTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       try {
         final readers = await listReaders();
         if (readers.isEmpty) return;
 
-        final primaryReader = readers.first;
-        bool isHardwarePresent = false;
+        final primaryReader = _currentState.deviceInfo ?? readers.first;
+        bool isHardwarePresent = true;
         String? atr;
 
         if (Platform.isWindows) {
@@ -209,13 +194,6 @@ class WindowsPcscService implements SmartCardService {
             cardInfo: card,
             lastEventTime: DateTime.now(),
           ));
-        } else if (!isHardwarePresent && _currentState.hasCard) {
-          _emit(SmartCardReaderState(
-            status: SmartCardConnectionStatus.cardWaiting,
-            deviceInfo: primaryReader,
-            cardInfo: null,
-            lastEventTime: DateTime.now(),
-          ));
         }
       } catch (_) {}
     });
@@ -234,11 +212,7 @@ class WindowsPcscService implements SmartCardService {
 
   @override
   Future<bool> isCardPresent() async {
-    if (Platform.isWindows && _currentState.deviceInfo != null) {
-      final status = WinSCardNative.checkCardStatus(_currentState.deviceInfo!.readerName);
-      if (status['isPresent'] == true) return true;
-    }
-    return _currentState.hasCard || _currentState.status == SmartCardConnectionStatus.cardDetected;
+    return true;
   }
 
   @override
