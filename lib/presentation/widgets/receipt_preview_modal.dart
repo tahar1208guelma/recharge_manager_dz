@@ -133,6 +133,21 @@ class ReceiptPreviewModal extends StatelessWidget {
                       style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
                       textAlign: TextAlign.center,
                     ),
+                    const SizedBox(height: 8),
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Powered by VAST solutions',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0891B2),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),

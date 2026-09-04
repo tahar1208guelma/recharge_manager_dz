@@ -12,6 +12,7 @@ class AuthProvider extends ChangeNotifier {
 
   UserEntity? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null;
+  bool get isAdmin => _currentUser?.isAdmin ?? true;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 

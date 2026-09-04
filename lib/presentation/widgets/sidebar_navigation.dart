@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/localization/app_localizations.dart';
 import '../providers/app_state_provider.dart';
+import '../providers/auth_provider.dart';
 
 class SidebarNavigation extends StatelessWidget {
   const SidebarNavigation({super.key});
@@ -10,6 +11,7 @@ class SidebarNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = Provider.of<AppStateProvider>(context);
+    final auth = Provider.of<AuthProvider>(context);
     final isCollapsed = appState.isSidebarCollapsed;
 
     return Container(
@@ -27,20 +29,36 @@ class SidebarNavigation extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Logo & Header
+          // Logo & Header with VAST solutions branding
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
             child: Row(
               mainAxisAlignment:
                   isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 38,
+                  height: 38,
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  child: const Icon(Icons.flash_on, color: Colors.white, size: 24),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.asset(
+                      'assets/images/developer_logo.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.flash_on, color: AppColors.primary, size: 20),
+                    ),
+                  ),
                 ),
                 if (!isCollapsed) ...[
                   const SizedBox(width: 12),
@@ -53,13 +71,18 @@ class SidebarNavigation extends StatelessWidget {
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontSize: 15,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          'POS Edition',
-                          style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                          'by VAST solutions',
+                          style: TextStyle(
+                            color: Color(0xFF06B6D4),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                          ),
                         ),
                       ],
                     ),
@@ -83,6 +106,7 @@ class SidebarNavigation extends StatelessWidget {
                   activeIcon: Icons.dashboard,
                   isSelected: appState.activeTab == AppTab.dashboard,
                   isCollapsed: isCollapsed,
+                  onTap: () => appState.setActiveTab(AppTab.dashboard),
                 ),
                 _buildNavItem(
                   context,
@@ -92,17 +116,7 @@ class SidebarNavigation extends StatelessWidget {
                   activeIcon: Icons.phone_android,
                   isSelected: appState.activeTab == AppTab.recharge,
                   isCollapsed: isCollapsed,
-                  badgeText: 'F1',
-                ),
-                _buildNavItem(
-                  context,
-                  tab: AppTab.customers,
-                  title: context.tr('nav_customers'),
-                  icon: Icons.people_outline,
-                  activeIcon: Icons.people,
-                  isSelected: appState.activeTab == AppTab.customers,
-                  isCollapsed: isCollapsed,
-                  badgeText: 'F2',
+                  onTap: () => appState.setActiveTab(AppTab.recharge),
                 ),
                 _buildNavItem(
                   context,
@@ -112,7 +126,17 @@ class SidebarNavigation extends StatelessWidget {
                   activeIcon: Icons.receipt_long,
                   isSelected: appState.activeTab == AppTab.history,
                   isCollapsed: isCollapsed,
-                  badgeText: 'F3',
+                  onTap: () => appState.setActiveTab(AppTab.history),
+                ),
+                _buildNavItem(
+                  context,
+                  tab: AppTab.customers,
+                  title: context.tr('nav_customers'),
+                  icon: Icons.people_outline,
+                  activeIcon: Icons.people,
+                  isSelected: appState.activeTab == AppTab.customers,
+                  isCollapsed: isCollapsed,
+                  onTap: () => appState.setActiveTab(AppTab.customers),
                 ),
                 _buildNavItem(
                   context,
@@ -122,6 +146,7 @@ class SidebarNavigation extends StatelessWidget {
                   activeIcon: Icons.bar_chart,
                   isSelected: appState.activeTab == AppTab.reports,
                   isCollapsed: isCollapsed,
+                  onTap: () => appState.setActiveTab(AppTab.reports),
                 ),
                 _buildNavItem(
                   context,
@@ -131,47 +156,90 @@ class SidebarNavigation extends StatelessWidget {
                   activeIcon: Icons.settings,
                   isSelected: appState.activeTab == AppTab.settings,
                   isCollapsed: isCollapsed,
+                  onTap: () => appState.setActiveTab(AppTab.settings),
                 ),
-                _buildNavItem(
-                  context,
-                  tab: AppTab.license,
-                  title: context.tr('nav_license'),
-                  icon: Icons.verified_user_outlined,
-                  activeIcon: Icons.verified_user,
-                  isSelected: appState.activeTab == AppTab.license,
-                  isCollapsed: isCollapsed,
-                ),
-                _buildNavItem(
-                  context,
-                  tab: AppTab.usbCheck,
-                  title: context.tr('nav_usb_check'),
-                  icon: Icons.usb,
-                  activeIcon: Icons.usb,
-                  isSelected: appState.activeTab == AppTab.usbCheck,
-                  isCollapsed: isCollapsed,
-                ),
+                if (auth.isAdmin)
+                  _buildNavItem(
+                    context,
+                    tab: AppTab.license,
+                    title: context.tr('nav_license'),
+                    icon: Icons.verified_user_outlined,
+                    activeIcon: Icons.verified_user,
+                    isSelected: appState.activeTab == AppTab.license,
+                    isCollapsed: isCollapsed,
+                    onTap: () => appState.setActiveTab(AppTab.license),
+                  ),
               ],
             ),
           ),
 
-          // Collapse Toggle Button
-          const Divider(color: AppColors.borderDark, height: 1),
-          ListTile(
-            onTap: () => appState.toggleSidebar(),
-            leading: Icon(
-              isCollapsed
-                  ? (context.isRtl ? Icons.chevron_left : Icons.chevron_right)
-                  : (context.isRtl ? Icons.chevron_right : Icons.chevron_left),
-              color: AppColors.textMuted,
-            ),
-            title: isCollapsed
-                ? null
-                : Text(
-                    isCollapsed ? '' : 'Collapse',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+          // Developer Footer Badge
+          if (!isCollapsed) ...[
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF334155)),
+              ),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Image.asset(
+                      'assets/images/developer_logo.png',
+                      width: 26,
+                      height: 26,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.code, color: Color(0xFF06B6D4), size: 18),
+                    ),
                   ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'VAST solutions',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        Text(
+                          'Telecom Software',
+                          style: TextStyle(
+                            color: Color(0xFF06B6D4),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const Divider(color: AppColors.borderDark, height: 1),
+
+          // Collapse Toggle Button
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: IconButton(
+              icon: Icon(
+                isCollapsed
+                    ? (context.isRtl ? Icons.chevron_left : Icons.chevron_right)
+                    : (context.isRtl ? Icons.chevron_right : Icons.chevron_left),
+                color: AppColors.textMuted,
+              ),
+              onPressed: () => appState.toggleSidebar(),
+            ),
           ),
-          const SizedBox(height: 8),
         ],
       ),
     );
@@ -185,64 +253,66 @@ class SidebarNavigation extends StatelessWidget {
     required IconData activeIcon,
     required bool isSelected,
     required bool isCollapsed,
+    required VoidCallback onTap,
     String? badgeText,
   }) {
-    final appState = Provider.of<AppStateProvider>(context, listen: false);
-
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: InkWell(
-        onTap: () => appState.setActiveTab(tab),
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: isCollapsed ? 12 : 16,
-            vertical: 12,
-          ),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primaryLight : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisAlignment:
-                isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
-            children: [
-              Icon(
-                isSelected ? activeIcon : icon,
-                color: isSelected ? Colors.white : AppColors.textMuted,
-                size: 20,
-              ),
-              if (!isCollapsed) ...[
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : AppColors.textLight,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      fontSize: 14,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Tooltip(
+        message: isCollapsed ? title : '',
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: isCollapsed ? 12 : 16,
+              vertical: 11,
+            ),
+            decoration: BoxDecoration(
+              color: isSelected ? AppColors.primaryLight : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment:
+                  isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+              children: [
+                Icon(
+                  isSelected ? activeIcon : icon,
+                  color: isSelected ? Colors.white : AppColors.textMuted,
+                  size: 20,
                 ),
-                if (badgeText != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isSelected ? Colors.black26 : AppColors.bgSurface,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
+                if (!isCollapsed) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: Text(
-                      badgeText,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                      title,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : AppColors.textLight,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 13,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (badgeText != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.black26 : AppColors.bgSurface,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        badgeText,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
