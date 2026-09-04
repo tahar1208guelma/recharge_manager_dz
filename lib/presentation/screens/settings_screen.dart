@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/localization/locale_provider.dart';
+import '../../services/updater/app_update_service.dart';
 import '../providers/settings_provider.dart';
+import '../widgets/app_update_modal.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -58,51 +60,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: context.tr('store_info'),
                 icon: Icons.storefront,
                 children: [
-                  TextField(
+                  TextFormField(
                     controller: _storeNameController,
                     decoration: InputDecoration(
                       labelText: context.tr('store_name'),
-                      prefixIcon: const Icon(Icons.business, color: AppColors.primary),
+                      prefixIcon: const Icon(Icons.store, color: AppColors.primary),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
+                  TextFormField(
                     controller: _storeAddressController,
                     decoration: InputDecoration(
                       labelText: context.tr('store_address'),
-                      prefixIcon: const Icon(Icons.location_on, color: AppColors.primary),
+                      prefixIcon: const Icon(Icons.location_on_outlined, color: AppColors.primary),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
+                  TextFormField(
                     controller: _storePhoneController,
                     keyboardType: TextInputType.phone,
                     decoration: InputDecoration(
                       labelText: context.tr('store_phone'),
-                      prefixIcon: const Icon(Icons.phone, color: AppColors.primary),
+                      prefixIcon: const Icon(Icons.phone_outlined, color: AppColors.primary),
                     ),
                   ),
                   const SizedBox(height: 16),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.save, size: 18),
+                      label: Text(context.tr('btn_save')),
                       onPressed: () async {
                         await settings.updateStoreInfo(
-                          name: _storeNameController.text.trim(),
-                          address: _storeAddressController.text.trim(),
-                          phone: _storePhoneController.text.trim(),
+                          name: _storeNameController.text,
+                          address: _storeAddressController.text,
+                          phone: _storePhoneController.text,
                         );
-                        if (mounted) {
+                        if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(context.tr('save')),
                               backgroundColor: AppColors.success,
+                              content: Text(context.tr('saved_successfully')),
                             ),
                           );
                         }
                       },
-                      child: Text(context.tr('save')),
                     ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Software Updates Center (مركز التحديثات)
+              _buildSectionCard(
+                title: 'تحديثات البرنامج (App Updates & Maintenance)',
+                icon: Icons.system_update_alt,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'الإصدار الحالي المثبت:',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.lightCard,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: AppColors.borderLight),
+                            ),
+                            child: const Text(
+                              'v${AppUpdateService.currentAppVersion} (Stable Release)',
+                              style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('فحص التحديثات الآن'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                        onPressed: () => AppUpdateModal.show(context),
+                      ),
+                    ],
                   ),
                 ],
               ),

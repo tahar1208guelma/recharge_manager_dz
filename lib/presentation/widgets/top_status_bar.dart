@@ -9,6 +9,7 @@ import '../providers/auth_provider.dart';
 import '../providers/license_provider.dart';
 import '../providers/recharge_provider.dart';
 import '../providers/usb_provider.dart';
+import 'app_update_modal.dart';
 import 'reader_device_info_modal.dart';
 import 'sim_pin_modal.dart';
 
@@ -70,6 +71,22 @@ class TopStatusBar extends StatelessWidget {
           _buildLicenseBadge(context, license),
 
           const Spacer(),
+
+          // Check for Updates Button
+          TextButton.icon(
+            icon: const Icon(Icons.system_update_alt, size: 16, color: AppColors.primary),
+            label: const Text(
+              'تحديث البرنامج',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.primary),
+            ),
+            style: TextButton.styleFrom(
+              backgroundColor: AppColors.primary.withOpacity(0.08),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => AppUpdateModal.show(context),
+          ),
+          const SizedBox(width: 8),
 
           // Refresh Balances Button (F5)
           IconButton(
