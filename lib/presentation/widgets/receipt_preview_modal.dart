@@ -134,11 +134,19 @@ class ReceiptPreviewModal extends StatelessWidget {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
-                    const Row(
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          'Powered by VAST solutions',
+                        Image.asset(
+                          'assets/images/developer_logo.png',
+                          width: 14,
+                          height: 14,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Powered by VAST SOLUTIONS DZ',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.bold,

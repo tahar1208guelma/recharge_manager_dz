@@ -51,51 +51,50 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Developer & App Brand Header
+                // Developer & App Brand Header (VAST SOLUTION)
                 Container(
-                  width: 90,
-                  height: 90,
-                  padding: const EdgeInsets.all(12),
+                  width: 220,
+                  height: 95,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.15),
-                        blurRadius: 15,
-                        offset: const Offset(0, 5),
+                        color: const Color(0xFF0891B2).withOpacity(0.18),
+                        blurRadius: 20,
+                        offset: const Offset(0, 6),
                       ),
                     ],
-                    border: Border.all(color: AppColors.borderLight, width: 2),
+                    border: Border.all(color: const Color(0xFF06B6D4).withOpacity(0.3), width: 1.5),
                   ),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/images/developer_logo.png',
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.flash_on, color: AppColors.primary, size: 40),
-                    ),
+                  child: Image.asset(
+                    'assets/images/developer_logo.png',
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.flash_on, color: AppColors.primary, size: 48),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
 
                 Text(
                   context.tr('app_name'),
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
 
                 const Text(
-                  'Powered by VAST solutions',
+                  'Powered by VAST SOLUTIONS DZ',
                   style: TextStyle(
                     color: Color(0xFF0891B2),
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
+                    letterSpacing: 1.2,
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 24),
 
                 // Username
                 TextField(

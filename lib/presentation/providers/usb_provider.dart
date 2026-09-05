@@ -8,14 +8,19 @@ import '../../services/smart_card/reader_device_info.dart';
 import '../../services/smart_card/smart_card_service.dart';
 import '../../services/smart_card/smart_card_service_factory.dart';
 import '../../services/smart_card/smart_card_state.dart';
+import '../../services/ussd/gsm_modem_service.dart';
 
 class UsbProvider extends ChangeNotifier {
   final SmartCardService _service;
+  final GsmModemService modemService = GsmModemService();
   StreamSubscription<SmartCardReaderState>? _subscription;
   SmartCardReaderState _state;
   List<ReaderDeviceInfo> _availableReaders = [];
   String _simPin = '0000';
   String? _lastExecutedUssd;
+  String? _activeComPort;
+  int _activeBaudRate = 115200;
+  final Map<OperatorType, String> _operatorComPorts = {};
 
   UsbProvider({SmartCardService? service})
       : _service = service ?? SmartCardServiceFactory.create(),
@@ -41,6 +46,27 @@ class UsbProvider extends ChangeNotifier {
   List<ReaderDeviceInfo> get availableReaders => _availableReaders;
   String get simPin => _simPin;
   String? get lastExecutedUssd => _lastExecutedUssd;
+  String? get activeComPort => _activeComPort;
+  int get activeBaudRate => _activeBaudRate;
+  Map<OperatorType, String> get operatorComPorts => Map.unmodifiable(_operatorComPorts);
+
+  void setActiveComPort(String? port, {int baudRate = 115200}) {
+    _activeComPort = port;
+    _activeBaudRate = baudRate;
+    modemService.setActivePort(port, baudRate: baudRate);
+    notifyListeners();
+  }
+
+  void setOperatorComPort(OperatorType operator, String port) {
+    if (port.trim().isNotEmpty) {
+      _operatorComPorts[operator] = port.trim();
+      notifyListeners();
+    }
+  }
+
+  String? getPortForOperator(OperatorType operator) {
+    return _operatorComPorts[operator] ?? _activeComPort;
+  }
 
   void setSimPin(String pin) {
     if (pin.trim().isNotEmpty) {

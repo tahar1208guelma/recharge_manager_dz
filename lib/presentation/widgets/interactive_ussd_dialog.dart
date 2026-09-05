@@ -6,6 +6,7 @@ import '../../domain/entities/ussd_session_state.dart';
 import '../../services/printing/receipt_template.dart';
 import '../../services/ussd/ussd_session_manager.dart';
 import '../providers/recharge_provider.dart';
+import '../providers/usb_provider.dart';
 import 'receipt_preview_modal.dart';
 
 class InteractiveUssdDialog extends StatefulWidget {
@@ -75,9 +76,13 @@ class _InteractiveUssdDialogState extends State<InteractiveUssdDialog> {
   }
 
   Future<void> _start() async {
+    final usb = Provider.of<UsbProvider>(context, listen: false);
+    final port = usb.getPortForOperator(widget.operator);
+
     await _sessionManager.startSession(
       operator: widget.operator,
       ussdCode: widget.initialUssdCode,
+      portName: port,
     );
   }
 
@@ -96,7 +101,9 @@ class _InteractiveUssdDialogState extends State<InteractiveUssdDialog> {
   void _sendReply(String text) {
     if (text.trim().isEmpty) return;
     _replyController.clear();
-    _sessionManager.sendReply(text.trim());
+    final usb = Provider.of<UsbProvider>(context, listen: false);
+    final port = usb.getPortForOperator(widget.operator);
+    _sessionManager.sendReply(text.trim(), portName: port);
   }
 
   Future<void> _handleSuccessfulCompletion() async {

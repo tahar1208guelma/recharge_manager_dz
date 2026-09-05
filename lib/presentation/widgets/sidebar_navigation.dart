@@ -37,26 +37,28 @@ class SidebarNavigation extends StatelessWidget {
                   isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
               children: [
                 Container(
-                  width: 38,
-                  height: 38,
+                  width: 44,
+                  height: 44,
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 6,
+                        color: const Color(0xFF0891B2).withOpacity(0.3),
+                        blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
                     ],
+                    border: Border.all(color: const Color(0xFF06B6D4).withOpacity(0.4), width: 1.5),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(6),
                     child: Image.asset(
                       'assets/images/developer_logo.png',
                       fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.flash_on, color: AppColors.primary, size: 20),
+                      filterQuality: FilterQuality.high,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.flash_on, color: AppColors.primary, size: 22),
                     ),
                   ),
                 ),
@@ -185,16 +187,25 @@ class SidebarNavigation extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
+                  Container(
+                  width: 36,
+                  height: 36,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF06B6D4), width: 1),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(5),
                     child: Image.asset(
                       'assets/images/developer_logo.png',
-                      width: 26,
-                      height: 26,
                       fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
                       errorBuilder: (_, __, ___) => const Icon(Icons.code, color: Color(0xFF06B6D4), size: 18),
                     ),
                   ),
+                ),
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Column(

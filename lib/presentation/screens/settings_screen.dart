@@ -225,25 +225,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Row(
                   children: [
                     Container(
-                      width: 75,
+                      width: 120,
                       height: 75,
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
+                            color: const Color(0xFF0891B2).withOpacity(0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
                         ],
+                        border: Border.all(color: const Color(0xFF06B6D4), width: 1.5),
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.asset(
                           'assets/images/developer_logo.png',
                           fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
                           errorBuilder: (_, __, ___) => const Icon(Icons.code, color: AppColors.primary, size: 36),
                         ),
                       ),
