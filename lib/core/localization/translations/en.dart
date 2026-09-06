@@ -30,6 +30,7 @@ const Map<String, String> enTranslations = {
   'nav_history': 'Transaction History',
   'nav_reports': 'Reports & Analytics',
   'nav_debug_console': 'AT Debug Console',
+  'nav_hardware_diagnostic': 'Hardware Diagnostic',
   'nav_settings': 'Settings',
   'nav_license': 'License Status',
   'nav_usb_check': 'USB Diagnostics (Android)',

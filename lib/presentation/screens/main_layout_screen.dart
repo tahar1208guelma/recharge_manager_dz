@@ -8,6 +8,7 @@ import 'android_usb_check_screen.dart';
 import 'customers_screen.dart';
 import 'dashboard_screen.dart';
 import 'debug_console_screen.dart';
+import 'hardware_diagnostic_screen.dart';
 import 'history_screen.dart';
 import 'license_activation_screen.dart';
 import 'recharge_screen.dart';
@@ -63,6 +64,8 @@ class MainLayoutScreen extends StatelessWidget {
         return const SmsInboxScreen();
       case AppTab.debugConsole:
         return const DebugConsoleScreen();
+      case AppTab.hardwareDiagnostic:
+        return const HardwareDiagnosticScreen();
       case AppTab.reports:
         return const ReportsScreen();
       case AppTab.settings:

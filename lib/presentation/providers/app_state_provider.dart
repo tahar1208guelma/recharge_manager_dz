@@ -8,6 +8,7 @@ enum AppTab {
   customers,
   reports,
   debugConsole,
+  hardwareDiagnostic,
   settings,
   license,
   usbCheck,

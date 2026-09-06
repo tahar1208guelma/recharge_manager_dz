@@ -172,6 +172,16 @@ class SidebarNavigation extends StatelessWidget {
                 ),
                 _buildNavItem(
                   context,
+                  tab: AppTab.hardwareDiagnostic,
+                  title: context.tr('nav_hardware_diagnostic'),
+                  icon: Icons.biotech_outlined,
+                  activeIcon: Icons.biotech,
+                  isSelected: appState.activeTab == AppTab.hardwareDiagnostic,
+                  isCollapsed: isCollapsed,
+                  onTap: () => appState.setActiveTab(AppTab.hardwareDiagnostic),
+                ),
+                _buildNavItem(
+                  context,
                   tab: AppTab.settings,
                   title: context.tr('nav_settings'),
                   icon: Icons.settings_outlined,

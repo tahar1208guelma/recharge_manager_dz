@@ -30,6 +30,7 @@ const Map<String, String> arTranslations = {
   'nav_history': 'سجل العمليات',
   'nav_reports': 'التقارير والإحصائيات',
   'nav_debug_console': 'طرفية AT والتصحيح',
+  'nav_hardware_diagnostic': 'تشخيص العتاد والمودم',
   'nav_settings': 'الإعدادات',
   'nav_license': 'حالة الترخيص',
   'nav_usb_check': 'فحص USB (أندرويد)',
