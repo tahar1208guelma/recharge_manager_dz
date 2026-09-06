@@ -122,6 +122,16 @@ class SidebarNavigation extends StatelessWidget {
                 ),
                 _buildNavItem(
                   context,
+                  tab: AppTab.smsInbox,
+                  title: context.tr('nav_sms_inbox'),
+                  icon: Icons.sms_outlined,
+                  activeIcon: Icons.sms,
+                  isSelected: appState.activeTab == AppTab.smsInbox,
+                  isCollapsed: isCollapsed,
+                  onTap: () => appState.setActiveTab(AppTab.smsInbox),
+                ),
+                _buildNavItem(
+                  context,
                   tab: AppTab.history,
                   title: context.tr('nav_history'),
                   icon: Icons.receipt_long_outlined,
@@ -149,6 +159,16 @@ class SidebarNavigation extends StatelessWidget {
                   isSelected: appState.activeTab == AppTab.reports,
                   isCollapsed: isCollapsed,
                   onTap: () => appState.setActiveTab(AppTab.reports),
+                ),
+                _buildNavItem(
+                  context,
+                  tab: AppTab.debugConsole,
+                  title: context.tr('nav_debug_console'),
+                  icon: Icons.terminal_outlined,
+                  activeIcon: Icons.terminal,
+                  isSelected: appState.activeTab == AppTab.debugConsole,
+                  isCollapsed: isCollapsed,
+                  onTap: () => appState.setActiveTab(AppTab.debugConsole),
                 ),
                 _buildNavItem(
                   context,

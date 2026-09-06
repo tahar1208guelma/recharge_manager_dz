@@ -25,9 +25,11 @@ const Map<String, String> frTranslations = {
   // Navigation & Menu
   'nav_dashboard': 'Tableau de bord',
   'nav_recharge': 'Recharge de crédit',
+  'nav_sms_inbox': 'Messages SMS',
   'nav_customers': 'Clients et Répertoire',
   'nav_history': 'Historique des transactions',
   'nav_reports': 'Rapports et Statistiques',
+  'nav_debug_console': 'Console de débogage AT',
   'nav_settings': 'Paramètres',
   'nav_license': 'Statut de licence',
   'nav_usb_check': 'Test USB (Android)',

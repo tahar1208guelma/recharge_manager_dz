@@ -7,11 +7,13 @@ import '../widgets/top_status_bar.dart';
 import 'android_usb_check_screen.dart';
 import 'customers_screen.dart';
 import 'dashboard_screen.dart';
+import 'debug_console_screen.dart';
 import 'history_screen.dart';
 import 'license_activation_screen.dart';
 import 'recharge_screen.dart';
 import 'reports_screen.dart';
 import 'settings_screen.dart';
+import 'sms_inbox_screen.dart';
 
 class MainLayoutScreen extends StatelessWidget {
   const MainLayoutScreen({super.key});
@@ -57,6 +59,10 @@ class MainLayoutScreen extends StatelessWidget {
         return const CustomersScreen();
       case AppTab.history:
         return const HistoryScreen();
+      case AppTab.smsInbox:
+        return const SmsInboxScreen();
+      case AppTab.debugConsole:
+        return const DebugConsoleScreen();
       case AppTab.reports:
         return const ReportsScreen();
       case AppTab.settings:

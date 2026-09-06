@@ -25,9 +25,11 @@ const Map<String, String> enTranslations = {
   // Navigation & Menu
   'nav_dashboard': 'Dashboard',
   'nav_recharge': 'Balance Recharge',
+  'nav_sms_inbox': 'SMS Messages',
   'nav_customers': 'Customers & Directory',
   'nav_history': 'Transaction History',
   'nav_reports': 'Reports & Analytics',
+  'nav_debug_console': 'AT Debug Console',
   'nav_settings': 'Settings',
   'nav_license': 'License Status',
   'nav_usb_check': 'USB Diagnostics (Android)',

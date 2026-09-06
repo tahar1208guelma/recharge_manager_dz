@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 enum AppTab {
   dashboard,
   recharge,
-  customers,
+  smsInbox,
   history,
+  customers,
   reports,
+  debugConsole,
   settings,
   license,
   usbCheck,

@@ -33,6 +33,7 @@ import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/customer_provider.dart';
 import 'presentation/providers/history_provider.dart';
 import 'presentation/providers/license_provider.dart';
+import 'presentation/providers/modem_provider.dart';
 import 'presentation/providers/recharge_provider.dart';
 import 'presentation/providers/settings_provider.dart';
 import 'presentation/providers/usb_provider.dart';
@@ -126,6 +127,7 @@ void main() async {
         ChangeNotifierProvider.value(value: licenseProvider),
         ChangeNotifierProvider.value(value: authProvider),
         ChangeNotifierProvider(create: (_) => AppStateProvider()),
+        ChangeNotifierProvider(create: (_) => ModemProvider()),
         ChangeNotifierProvider(create: (_) => UsbProvider(service: smartCardService)),
         ChangeNotifierProvider(create: (_) => CustomerProvider(repository: customerRepo)),
         ChangeNotifierProvider(create: (_) => HistoryProvider(repository: transactionRepo)),

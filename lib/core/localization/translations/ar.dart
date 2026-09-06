@@ -25,9 +25,11 @@ const Map<String, String> arTranslations = {
   // Navigation & Menu
   'nav_dashboard': 'الرئيسية',
   'nav_recharge': 'تعبئة الرصيد',
+  'nav_sms_inbox': 'رسائل SMS',
   'nav_customers': 'الزبائن والدليل',
   'nav_history': 'سجل العمليات',
   'nav_reports': 'التقارير والإحصائيات',
+  'nav_debug_console': 'طرفية AT والتصحيح',
   'nav_settings': 'الإعدادات',
   'nav_license': 'حالة الترخيص',
   'nav_usb_check': 'فحص USB (أندرويد)',

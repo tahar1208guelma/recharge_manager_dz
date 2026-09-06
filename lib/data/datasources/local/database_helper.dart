@@ -157,6 +157,78 @@ class DatabaseHelper {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE operators (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        name_ar TEXT NOT NULL,
+        operator_type TEXT NOT NULL,
+        country TEXT NOT NULL,
+        mcc TEXT NOT NULL,
+        mnc TEXT NOT NULL,
+        phone_prefixes TEXT NOT NULL,
+        default_pin TEXT NOT NULL,
+        ussd_templates TEXT NOT NULL,
+        sms_commands TEXT NOT NULL,
+        preset_amounts TEXT NOT NULL,
+        is_enabled INTEGER DEFAULT 1
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE devices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        port_name TEXT NOT NULL UNIQUE,
+        friendly_name TEXT NOT NULL,
+        device_type TEXT NOT NULL,
+        manufacturer TEXT,
+        vid TEXT,
+        pid TEXT,
+        assigned_operator TEXT,
+        baud_rate INTEGER DEFAULT 115200,
+        last_seen TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE transaction_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        transaction_id TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        description TEXT NOT NULL,
+        raw_data TEXT,
+        timestamp TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE INDEX idx_events_txid ON transaction_events(transaction_id);
+    ''');
+
+    await db.execute('''
+      CREATE TABLE sms_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        index_on_sim INTEGER,
+        sender_or_recipient TEXT NOT NULL,
+        text TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        type TEXT NOT NULL,
+        is_read INTEGER DEFAULT 1,
+        raw_pdu TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        action TEXT NOT NULL,
+        details TEXT,
+        ip_or_device TEXT,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
     // Seed default admin user (admin / admin123)
     final adminHash = EncryptionService.hash('admin123');
     await db.insert('users', {
