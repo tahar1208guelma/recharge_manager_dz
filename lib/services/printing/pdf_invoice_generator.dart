@@ -22,7 +22,7 @@ class PdfInvoiceGenerator {
                 // Store Name & Info
                 pw.Text(
                   receipt.storeName,
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13),
+                  style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13),
                   textAlign: pw.TextAlign.center,
                 ),
                 pw.SizedBox(height: 2),
@@ -40,7 +40,7 @@ class PdfInvoiceGenerator {
                 // Receipt Title
                 pw.Text(
                   'TELECOM RECHARGE RECEIPT',
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+                  style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
                 ),
                 pw.SizedBox(height: 4),
 
@@ -59,10 +59,10 @@ class PdfInvoiceGenerator {
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    pw.Text('AMOUNT PAID:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                    pw.Text('AMOUNT PAID:', style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
                     pw.Text(
                       CurrencyFormatter.format(receipt.amount),
-                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11),
+                      style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11),
                     ),
                   ],
                 ),
@@ -80,7 +80,7 @@ class PdfInvoiceGenerator {
                         pw.Text('RECHARGE CODE / PIN', style: const pw.TextStyle(fontSize: 7)),
                         pw.Text(
                           receipt.rechargeCode!,
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11),
+                          style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11),
                         ),
                       ],
                     ),
@@ -119,7 +119,7 @@ class PdfInvoiceGenerator {
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
           pw.Text(label, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey800)),
-          pw.Text(value, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+          pw.Text(value, style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
         ],
       ),
     );
