@@ -44,6 +44,15 @@ class UssdSessionManager {
       // Send to hardware modem / telecom network
       final resp = await modemService.sendUssd(ussdCode, portName: portName);
 
+      if (!resp.isSuccess) {
+        state = state.copyWith(
+          status: UssdSessionStatus.failed,
+          errorMessage: resp.error ?? resp.cleanMessage,
+        );
+        _emit(state);
+        return state;
+      }
+
       final simMessage = UssdSessionMessage(
         content: resp.cleanMessage,
         isFromSim: true,
@@ -101,6 +110,15 @@ class UssdSessionManager {
 
     try {
       final resp = await modemService.sendUssd(replyText, portName: portName);
+
+      if (!resp.isSuccess) {
+        state = state.copyWith(
+          status: UssdSessionStatus.failed,
+          errorMessage: resp.error ?? resp.cleanMessage,
+        );
+        _emit(state);
+        return state;
+      }
 
       final simMessage = UssdSessionMessage(
         content: resp.cleanMessage,

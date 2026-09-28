@@ -237,11 +237,77 @@ class MockSmartCardService implements SmartCardService {
   }
 
   /// Simulation helper: Trigger error state -> Transitions to 🔴 Reader Error
-  void simulateError(String errorMessage) {
+  void simulateError(String errorMessage, [SmartCardErrorCode errorCode = SmartCardErrorCode.protocolError]) {
     _emit(SmartCardReaderState(
       status: SmartCardConnectionStatus.readerError, // 🔴 Reader Error
+      errorCode: errorCode,
       deviceInfo: _currentState.deviceInfo,
       errorMessage: errorMessage,
+      lastEventTime: DateTime.now(),
+    ));
+  }
+
+  /// Simulation helper: Simulate no reader detected (noReader)
+  void simulateNoReader() {
+    _activeConnection?.disconnect();
+    _activeConnection = null;
+    _emit(SmartCardReaderState(
+      status: SmartCardConnectionStatus.disconnected,
+      errorCode: SmartCardErrorCode.noReader,
+      deviceInfo: null,
+      errorMessage: 'لم يتم العثور على أي قارئ بطاقات ذكية (noReader)',
+      lastEventTime: DateTime.now(),
+    ));
+  }
+
+  /// Simulation helper: Simulate no card inserted in reader (noCard)
+  void simulateNoCard() {
+    final device = _currentState.deviceInfo ?? ReaderDiscovery.inspectReader('HID Global OMNIKEY 3x21 Smart Card Reader (076B:3021)');
+    _activeConnection?.disconnect();
+    _activeConnection = null;
+    _emit(SmartCardReaderState(
+      status: SmartCardConnectionStatus.cardWaiting,
+      errorCode: SmartCardErrorCode.noCard,
+      deviceInfo: device,
+      errorMessage: 'لا توجد بطاقة شريحة مدرجة في القارئ (noCard)',
+      lastEventTime: DateTime.now(),
+    ));
+  }
+
+  /// Simulation helper: Simulate card muted (cardMuted)
+  void simulateCardMuted() {
+    final device = _currentState.deviceInfo ?? ReaderDiscovery.inspectReader('HID Global OMNIKEY 3x21 Smart Card Reader (076B:3021)');
+    _activeConnection?.disconnect();
+    _activeConnection = null;
+    _emit(SmartCardReaderState(
+      status: SmartCardConnectionStatus.readerError,
+      errorCode: SmartCardErrorCode.cardMuted,
+      deviceInfo: device,
+      errorMessage: 'البطاقة صامتة ولا تصدر إشارة تنشيط ATR (cardMuted)',
+      lastEventTime: DateTime.now(),
+    ));
+  }
+
+  /// Simulation helper: Simulate card PIN locked (pinLocked)
+  void simulatePinLocked() {
+    final device = _currentState.deviceInfo ?? ReaderDiscovery.inspectReader('HID Global OMNIKEY 3x21 Smart Card Reader (076B:3021)');
+    _emit(SmartCardReaderState(
+      status: SmartCardConnectionStatus.readerError,
+      errorCode: SmartCardErrorCode.pinLocked,
+      deviceInfo: device,
+      errorMessage: 'الشريحة مقفلة برمز PIN / PUK (pinLocked)',
+      lastEventTime: DateTime.now(),
+    ));
+  }
+
+  /// Simulation helper: Simulate protocol or APDU error (protocolError)
+  void simulateProtocolError() {
+    final device = _currentState.deviceInfo ?? ReaderDiscovery.inspectReader('HID Global OMNIKEY 3x21 Smart Card Reader (076B:3021)');
+    _emit(SmartCardReaderState(
+      status: SmartCardConnectionStatus.readerError,
+      errorCode: SmartCardErrorCode.protocolError,
+      deviceInfo: device,
+      errorMessage: 'خطأ في بروتوكول الاتصال ونقل أوامر APDU (protocolError)',
       lastEventTime: DateTime.now(),
     ));
   }
@@ -251,6 +317,7 @@ class MockSmartCardService implements SmartCardService {
     final badDevice = ReaderDiscovery.inspectReader('Generic USB Mass Storage Flash Drive');
     _emit(SmartCardReaderState(
       status: SmartCardConnectionStatus.readerError,
+      errorCode: SmartCardErrorCode.protocolError,
       deviceInfo: badDevice,
       errorMessage: badDevice.errorMessage ?? 'Incompatible USB device.',
       lastEventTime: DateTime.now(),

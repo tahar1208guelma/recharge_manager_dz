@@ -44,6 +44,7 @@ import 'presentation/screens/main_layout_screen.dart';
 import 'services/licensing/license_client_service.dart';
 import 'services/operators/operator_factory.dart';
 import 'services/smart_card/smart_card_service_factory.dart';
+import 'modem/modem_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -86,7 +87,6 @@ void main() async {
     remoteDataSource: LicenseRemoteDataSourceImpl(),
     secureStorage: secureStorage,
   );
-  final smartCardService = SmartCardServiceFactory.create();
 
   // Use cases
   final rechargeUseCase = ExecuteRechargeUseCase(
@@ -119,6 +119,17 @@ void main() async {
     AppLogger.warn('LicenseProvider init: $e');
   }
 
+  final isMock = settingsProvider.mockMode;
+  final smartCardService = SmartCardServiceFactory.create(forceMock: isMock);
+  final usbProvider = UsbProvider(service: smartCardService, isSimulationMode: isMock);
+  final modemService = ModemService(isSimulationMode: isMock);
+  final modemProvider = ModemProvider(modemService: modemService);
+
+  settingsProvider.addListener(() {
+    usbProvider.setSimulationMode(settingsProvider.mockMode);
+    modemService.isSimulationMode = settingsProvider.mockMode;
+  });
+
   runApp(
     MultiProvider(
       providers: [
@@ -127,8 +138,8 @@ void main() async {
         ChangeNotifierProvider.value(value: licenseProvider),
         ChangeNotifierProvider.value(value: authProvider),
         ChangeNotifierProvider(create: (_) => AppStateProvider()),
-        ChangeNotifierProvider(create: (_) => ModemProvider()),
-        ChangeNotifierProvider(create: (_) => UsbProvider(service: smartCardService)),
+        ChangeNotifierProvider.value(value: modemProvider),
+        ChangeNotifierProvider.value(value: usbProvider),
         ChangeNotifierProvider(create: (_) => CustomerProvider(repository: customerRepo)),
         ChangeNotifierProvider(create: (_) => HistoryProvider(repository: transactionRepo)),
         ChangeNotifierProvider(

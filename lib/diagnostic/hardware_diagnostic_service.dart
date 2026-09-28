@@ -5,6 +5,10 @@ import '../core/utils/app_logger.dart';
 import 'models/diagnostic_report.dart';
 
 class HardwareDiagnosticService {
+  final bool isSimulation;
+
+  HardwareDiagnosticService({this.isSimulation = false});
+
   /// Runs a comprehensive, non-destructive hardware diagnostic scan
   Future<DiagnosticReport> runDiagnostic({
     Function(String progressMessage, double percent)? onProgress,
@@ -100,6 +104,30 @@ class HardwareDiagnosticService {
   // ================= PRIVATE SCAN IMPLEMENTATIONS =================
 
   Future<List<UsbDeviceInfo>> _scanUsbDevices() async {
+    if (isSimulation) {
+      return [
+        const UsbDeviceInfo(
+          name: 'HUAWEI Mobile Connect - 3G Modem Interface',
+          vid: '12D1',
+          pid: '1001',
+          manufacturer: 'Huawei Technologies Co., Ltd.',
+          product: 'HUAWEI Mobile',
+          serialNumber: '8921301000001234567',
+          hardwareId: r'USB\VID_12D1&PID_1001&REV_0000',
+          deviceClass: 'Modem',
+        ),
+        const UsbDeviceInfo(
+          name: 'USB Composite Device',
+          vid: '12D1',
+          pid: '1001',
+          manufacturer: 'Standard USB',
+          product: 'USB Controller',
+          hardwareId: r'USB\VID_12D1&PID_1001',
+          deviceClass: 'USB',
+        ),
+      ];
+    }
+
     final devices = <UsbDeviceInfo>[];
 
     if (Platform.isWindows) {
@@ -143,35 +171,14 @@ Get-CimInstance Win32_PnPEntity | Where-Object { \$_.DeviceID -like 'USB*' } | S
       }
     }
 
-    if (devices.isEmpty) {
-      // Mock / fallback info for testing or non-Windows platforms
-      devices.addAll([
-        const UsbDeviceInfo(
-          name: 'HUAWEI Mobile Connect - 3G Modem Interface',
-          vid: '12D1',
-          pid: '1001',
-          manufacturer: 'Huawei Technologies Co., Ltd.',
-          product: 'HUAWEI Mobile',
-          serialNumber: '8921301000001234567',
-          hardwareId: r'USB\VID_12D1&PID_1001&REV_0000',
-          deviceClass: 'Modem',
-        ),
-        const UsbDeviceInfo(
-          name: 'USB Composite Device',
-          vid: '12D1',
-          pid: '1001',
-          manufacturer: 'Standard USB',
-          product: 'USB Controller',
-          hardwareId: r'USB\VID_12D1&PID_1001',
-          deviceClass: 'USB',
-        ),
-      ]);
-    }
-
     return devices;
   }
 
   Future<List<String>> _scanPcscReaders() async {
+    if (isSimulation) {
+      return ['HID Global OMNIKEY 3x21 Smart Card Reader (076B:3021)'];
+    }
+
     final readers = <String>[];
 
     if (Platform.isWindows) {
@@ -192,6 +199,38 @@ Get-CimInstance Win32_PnPEntity | Where-Object { \$_.PNPClass -eq 'SmartCardRead
   }
 
   Future<List<ComPortDiagnostic>> _probeComPorts({Function(String msg, double pct)? onProgress}) async {
+    final safeCommands = [
+      'AT',
+      'ATE0',
+      'AT+CPIN?',
+      'AT+CSQ',
+      'AT+CREG?',
+      'AT+COPS?',
+      'AT+CMGF=?',
+      'AT+CUSD=?',
+    ];
+
+    if (isSimulation) {
+      final cmdResults = <AtCommandTestResult>[];
+      for (final cmd in safeCommands) {
+        cmdResults.add(AtCommandTestResult(
+          command: cmd,
+          isSuccess: true,
+          rawOutput: _generateMockOutput(cmd),
+          durationMs: 5,
+        ));
+      }
+      return [
+        ComPortDiagnostic(
+          portName: 'COM4',
+          friendlyName: 'Cellular Serial Port (COM4)',
+          isAtResponsive: true,
+          probedBaudRate: 115200,
+          commandResults: cmdResults,
+        ),
+      ];
+    }
+
     final diagnostics = <ComPortDiagnostic>[];
     List<String> portNames = [];
 
@@ -206,19 +245,8 @@ Get-CimInstance Win32_PnPEntity | Where-Object { \$_.PNPClass -eq 'SmartCardRead
     }
 
     if (portNames.isEmpty) {
-      portNames = ['COM4']; // Fallback for simulation / non-windows
+      return []; // In real mode, return empty if no hardware ports exist
     }
-
-    final safeCommands = [
-      'AT',
-      'ATE0',
-      'AT+CPIN?',
-      'AT+CSQ',
-      'AT+CREG?',
-      'AT+COPS?',
-      'AT+CMGF=?',
-      'AT+CUSD=?',
-    ];
 
     for (int i = 0; i < portNames.length; i++) {
       final port = portNames[i];

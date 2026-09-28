@@ -1,10 +1,10 @@
 // ignore_for_file: constant_identifier_names
 
-import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 import 'package:ffi/ffi.dart';
 import '../../../core/utils/app_logger.dart';
+import '../smart_card_state.dart';
 
 // PC/SC Constants
 const int SCARD_SCOPE_USER = 0;
@@ -33,6 +33,13 @@ const int SCARD_SWALLOWED = 0x00000003;
 const int SCARD_POWERED = 0x00000004;
 const int SCARD_NEGOTIABLE = 0x00000005;
 const int SCARD_SPECIFIC = 0x00000006;
+
+final class ScardIoRequest extends Struct {
+  @Uint32()
+  external int dwProtocol;
+  @Uint32()
+  external int cbPciLength;
+}
 
 typedef SCardEstablishContextC = Int32 Function(
   Uint32 dwScope,
@@ -96,6 +103,25 @@ typedef SCardStatusADart = int Function(
   Pointer<Uint32> pcbAtrLen,
 );
 
+typedef SCardTransmitC = Int32 Function(
+  IntPtr hCard,
+  Pointer<ScardIoRequest> pioSendPci,
+  Pointer<Uint8> pbSendBuffer,
+  Uint32 cbSendLength,
+  Pointer<ScardIoRequest> pioRecvPci,
+  Pointer<Uint8> pbRecvBuffer,
+  Pointer<Uint32> pcbRecvLength,
+);
+typedef SCardTransmitDart = int Function(
+  int hCard,
+  Pointer<ScardIoRequest> pioSendPci,
+  Pointer<Uint8> pbSendBuffer,
+  int cbSendLength,
+  Pointer<ScardIoRequest> pioRecvPci,
+  Pointer<Uint8> pbRecvBuffer,
+  Pointer<Uint32> pcbRecvLength,
+);
+
 typedef SCardDisconnectC = Int32 Function(
   IntPtr hCard,
   Uint32 dwDisposition,
@@ -118,6 +144,7 @@ class WinSCardNative {
   static SCardListReadersADart? _listReaders;
   static SCardConnectADart? _connect;
   static SCardStatusADart? _status;
+  static SCardTransmitDart? _transmit;
   static SCardDisconnectDart? _disconnect;
   static SCardReleaseContextDart? _releaseContext;
   static bool _isInitialized = false;
@@ -139,6 +166,10 @@ class WinSCardNative {
       _disconnect = _winscardLib!.lookupFunction<SCardDisconnectC, SCardDisconnectDart>('SCardDisconnect');
       _releaseContext = _winscardLib!.lookupFunction<SCardReleaseContextC, SCardReleaseContextDart>('SCardReleaseContext');
 
+      try {
+        _transmit = _winscardLib!.lookupFunction<SCardTransmitC, SCardTransmitDart>('SCardTransmit');
+      } catch (_) {}
+
       AppLogger.info('WinSCardNative: winscard.dll loaded successfully.');
       return true;
     } catch (e) {
@@ -150,19 +181,8 @@ class WinSCardNative {
 
   /// Attempts to start the Windows Smart Card Service (SCardSvr) if stopped
   static Future<bool> ensureSmartCardServiceRunning() async {
-    if (!Platform.isWindows) return false;
-    try {
-      final res = await Process.run('net', ['start', 'SCardSvr']);
-      AppLogger.info('net start SCardSvr result: ${res.stdout} ${res.stderr}');
-      return true;
-    } catch (_) {
-      try {
-        await Process.run('sc', ['start', 'SCardSvr']);
-        return true;
-      } catch (_) {
-        return false;
-      }
-    }
+    // SCardEstablishContext triggers SCardSvr service start automatically on modern Windows.
+    return true;
   }
 
   /// Lists all smart card readers currently attached via winscard.dll
@@ -222,53 +242,16 @@ class WinSCardNative {
     }
   }
 
-  /// Scans Windows PNP Devices & COM Ports via PowerShell WMI to catch any USB SIM card dongles / COM ports
-  static Future<List<String>> listPnpAndSerialDevices() async {
-    if (!Platform.isWindows) return [];
-
-    final found = <String>[];
-    try {
-      // Query Windows PNP for Smart Card Readers, Modems, and Ports
-      const script = "Get-CimInstance Win32_PnPEntity | Where-Object { \$_.PNPClass -in @('SmartCardReader','Ports','Modem') -or \$_.Name -match 'Smart|Card|SIM|ACR|Omnikey|Gemalto|CH340|FTDI|Prolific|Serial' } | Select-Object -ExpandProperty Name";
-      final result = await Process.run('powershell', ['-NoProfile', '-Command', script]);
-
-      if (result.exitCode == 0 && result.stdout != null) {
-        final lines = LineSplitter.split(result.stdout.toString());
-        for (final line in lines) {
-          final trimmed = line.trim();
-          if (trimmed.isNotEmpty && !found.contains(trimmed)) {
-            found.add(trimmed);
-          }
-        }
-      }
-    } catch (e) {
-      AppLogger.warn('PowerShell PNP scan error: $e');
-    }
-
-    return found;
-  }
-
-  /// Combined master list of all PC/SC Readers, USB Smart Card devices, and Virtual COM Port readers
+  /// Master list of all real PC/SC Smart Card readers attached via Windows Smart Card Subsystem
   static Future<List<String>> listAllReaders() async {
-    final pcscList = listPcscReaders();
-    final pnpList = await listPnpAndSerialDevices();
-
-    final all = <String>{...pcscList, ...pnpList}.toList();
-    if (all.isEmpty) {
-      // Provide standard default USB SIM card reader profiles for easy one-click selection
-      return [
-        'ACS ACR39U Smart Card Reader (USB CCID)',
-        'Generic USB Smart Card Reader (WinSCard PC/SC)',
-        'USB SIM Card Dongle / GSM Modem (COM Port)',
-        'الوضع المباشر للشريحة (Direct SIM POS Mode)',
-      ];
-    }
-    return all;
+    return listPcscReaders();
   }
 
   /// Checks if a card is present in the specified reader and returns ATR hex string
   static Map<String, dynamic> checkCardStatus(String readerName) {
-    if (!init()) return {'isPresent': true, 'atr': null};
+    if (!init()) {
+      return {'isPresent': false, 'atr': null, 'errorCode': SmartCardErrorCode.noReader};
+    }
 
     final pContext = calloc<IntPtr>();
     final pCard = calloc<IntPtr>();
@@ -281,7 +264,9 @@ class WinSCardNative {
 
     try {
       final res = _establishContext!(SCARD_SCOPE_USER, nullptr, nullptr, pContext);
-      if (res != 0) return {'isPresent': true, 'atr': null};
+      if (res != 0) {
+        return {'isPresent': false, 'atr': null, 'errorCode': SmartCardErrorCode.noReader};
+      }
 
       final hContext = pContext.value;
       final szReader = readerName.toNativeUtf8();
@@ -299,7 +284,8 @@ class WinSCardNative {
 
       if (connectRes != 0) {
         _releaseContext!(hContext);
-        return {'isPresent': true, 'atr': null};
+        final err = connectRes == SCARD_E_NO_SMARTCARD ? SmartCardErrorCode.noCard : SmartCardErrorCode.noReader;
+        return {'isPresent': false, 'atr': null, 'errorCode': err};
       }
 
       final hCard = pCard.value;
@@ -318,6 +304,7 @@ class WinSCardNative {
 
       bool isPresent = false;
       String? atrHex;
+      SmartCardErrorCode errorCode = SmartCardErrorCode.none;
 
       if (statusRes == 0) {
         final state = pState.value;
@@ -327,8 +314,16 @@ class WinSCardNative {
           for (int i = 0; i < pAtrLen.value; i++) {
             atrBytes.add(pAtr[i]);
           }
-          atrHex = atrBytes.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join(' ');
+          if (atrBytes.isNotEmpty) {
+            atrHex = atrBytes.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join(' ');
+          } else {
+            errorCode = SmartCardErrorCode.cardMuted;
+          }
+        } else {
+          errorCode = SmartCardErrorCode.noCard;
         }
+      } else {
+        errorCode = SmartCardErrorCode.protocolError;
       }
 
       _disconnect!(hCard, SCARD_LEAVE_CARD);
@@ -337,9 +332,10 @@ class WinSCardNative {
       return {
         'isPresent': isPresent,
         'atr': atrHex,
+        'errorCode': errorCode,
       };
     } catch (e) {
-      return {'isPresent': true, 'atr': null};
+      return {'isPresent': false, 'atr': null, 'errorCode': SmartCardErrorCode.protocolError};
     } finally {
       calloc.free(pContext);
       calloc.free(pCard);
@@ -349,6 +345,136 @@ class WinSCardNative {
       calloc.free(pReaderLen);
       calloc.free(pAtrLen);
       calloc.free(pAtr);
+    }
+  }
+
+  /// Transmits a raw APDU byte array to the card via winscard SCardTransmit
+  static Map<String, dynamic> transmitApdu(String readerName, List<int> apdu) {
+    if (!init() || _transmit == null) {
+      return {
+        'isSuccess': false,
+        'sw1': 0x6F,
+        'sw2': 0x00,
+        'data': <int>[],
+        'errorCode': SmartCardErrorCode.noReader,
+      };
+    }
+
+    final pContext = calloc<IntPtr>();
+    final pCard = calloc<IntPtr>();
+    final pActiveProtocol = calloc<Uint32>();
+
+    try {
+      final res = _establishContext!(SCARD_SCOPE_USER, nullptr, nullptr, pContext);
+      if (res != 0) {
+        return {
+          'isSuccess': false,
+          'sw1': 0x6F,
+          'sw2': 0x00,
+          'data': <int>[],
+          'errorCode': SmartCardErrorCode.noReader,
+        };
+      }
+
+      final hContext = pContext.value;
+      final szReader = readerName.toNativeUtf8();
+
+      final connectRes = _connect!(
+        hContext,
+        szReader,
+        SCARD_SHARE_SHARED,
+        SCARD_PROTOCOL_ANY,
+        pCard,
+        pActiveProtocol,
+      );
+
+      calloc.free(szReader);
+
+      if (connectRes != 0) {
+        _releaseContext!(hContext);
+        final err = connectRes == SCARD_E_NO_SMARTCARD ? SmartCardErrorCode.noCard : SmartCardErrorCode.noReader;
+        return {
+          'isSuccess': false,
+          'sw1': 0x6F,
+          'sw2': 0x00,
+          'data': <int>[],
+          'errorCode': err,
+        };
+      }
+
+      final hCard = pCard.value;
+      final activeProto = pActiveProtocol.value;
+
+      final pSendPci = calloc<ScardIoRequest>();
+      pSendPci.ref.dwProtocol = activeProto;
+      pSendPci.ref.cbPciLength = sizeOf<ScardIoRequest>();
+
+      final pSendBuffer = calloc<Uint8>(apdu.length);
+      for (int i = 0; i < apdu.length; i++) {
+        pSendBuffer[i] = apdu[i];
+      }
+
+      final pRecvBuffer = calloc<Uint8>(258);
+      final pRecvLength = calloc<Uint32>()..value = 258;
+
+      final transmitRes = _transmit!(
+        hCard,
+        pSendPci,
+        pSendBuffer,
+        apdu.length,
+        nullptr,
+        pRecvBuffer,
+        pRecvLength,
+      );
+
+      bool isSuccess = false;
+      int sw1 = 0x6F;
+      int sw2 = 0x00;
+      final data = <int>[];
+      SmartCardErrorCode errorCode = SmartCardErrorCode.none;
+
+      if (transmitRes == 0 && pRecvLength.value >= 2) {
+        final totalRecv = pRecvLength.value;
+        sw1 = pRecvBuffer[totalRecv - 2];
+        sw2 = pRecvBuffer[totalRecv - 1];
+        for (int i = 0; i < totalRecv - 2; i++) {
+          data.add(pRecvBuffer[i]);
+        }
+        isSuccess = (sw1 == 0x90 && sw2 == 0x00) || sw1 == 0x9F || sw1 == 0x61;
+        if (sw1 == 0x98 && (sw2 == 0x04 || sw2 == 0x08)) {
+          errorCode = SmartCardErrorCode.pinLocked;
+        }
+      } else {
+        errorCode = SmartCardErrorCode.protocolError;
+      }
+
+      calloc.free(pSendPci);
+      calloc.free(pSendBuffer);
+      calloc.free(pRecvBuffer);
+      calloc.free(pRecvLength);
+
+      _disconnect!(hCard, SCARD_LEAVE_CARD);
+      _releaseContext!(hContext);
+
+      return {
+        'isSuccess': isSuccess,
+        'sw1': sw1,
+        'sw2': sw2,
+        'data': data,
+        'errorCode': errorCode,
+      };
+    } catch (e) {
+      return {
+        'isSuccess': false,
+        'sw1': 0x6F,
+        'sw2': 0x00,
+        'data': <int>[],
+        'errorCode': SmartCardErrorCode.protocolError,
+      };
+    } finally {
+      calloc.free(pContext);
+      calloc.free(pCard);
+      calloc.free(pActiveProtocol);
     }
   }
 }

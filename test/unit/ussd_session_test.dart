@@ -1,12 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:recharge_manager_dz/core/constants/operator_constants.dart';
+import 'package:recharge_manager_dz/domain/entities/ussd_session_state.dart';
 import 'package:recharge_manager_dz/services/ussd/gsm_modem_service.dart';
 import 'package:recharge_manager_dz/services/ussd/ussd_session_manager.dart';
 
 void main() {
   group('Interactive USSD Session Manager Tests', () {
     test('Should start session, receive SIM prompt, and wait for user confirmation', () async {
-      final sessionManager = UssdSessionManager(modemService: GsmModemService());
+      final sessionManager = UssdSessionManager(modemService: GsmModemService(isSimulationMode: true));
 
       final state = await sessionManager.startSession(
         operator: OperatorType.mobilis,
@@ -20,7 +21,7 @@ void main() {
     });
 
     test('Should reply with 1 and complete session with transaction reference', () async {
-      final sessionManager = UssdSessionManager(modemService: GsmModemService());
+      final sessionManager = UssdSessionManager(modemService: GsmModemService(isSimulationMode: true));
 
       await sessionManager.startSession(
         operator: OperatorType.mobilis,
@@ -34,7 +35,7 @@ void main() {
     });
 
     test('Should reply with 2 and cancel session cleanly', () async {
-      final sessionManager = UssdSessionManager(modemService: GsmModemService());
+      final sessionManager = UssdSessionManager(modemService: GsmModemService(isSimulationMode: true));
 
       await sessionManager.startSession(
         operator: OperatorType.mobilis,
@@ -43,6 +44,18 @@ void main() {
 
       final nextState = await sessionManager.sendReply('2');
       expect(nextState.status.name, 'cancelled');
+    });
+
+    test('Should transition to failed status when modem hardware is missing in real mode', () async {
+      final sessionManager = UssdSessionManager(modemService: GsmModemService(isSimulationMode: false));
+
+      final state = await sessionManager.startSession(
+        operator: OperatorType.mobilis,
+        ussdCode: '*630*0661123456*04*500*11111#',
+      );
+
+      expect(state.status, UssdSessionStatus.failed);
+      expect(state.errorMessage, contains('Hardware missing'));
     });
   });
 }

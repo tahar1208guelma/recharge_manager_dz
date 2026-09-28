@@ -32,7 +32,8 @@ class AndroidUsbHostCardConnection implements CardConnection {
     if (!_isConnected) {
       return SmartCardResponse(data: [], sw1: 0x6F, sw2: 0x00, isSuccess: false);
     }
-    return SmartCardProtocol.parseApduResponse([0x90, 0x00]);
+    // Android USB Host CCID Bulk transfer requires active native endpoint connection
+    return SmartCardResponse(data: [], sw1: 0x6F, sw2: 0x00, isSuccess: false);
   }
 
   @override
@@ -101,6 +102,8 @@ class AndroidUsbHostService implements SmartCardService {
     } else {
       _emit(SmartCardReaderState(
         status: SmartCardConnectionStatus.disconnected,
+        errorCode: SmartCardErrorCode.noReader,
+        errorMessage: 'لم يتم العثور على قارئ بطاقات USB OTG (noReader)',
         lastEventTime: DateTime.now(),
       ));
     }
@@ -108,6 +111,10 @@ class AndroidUsbHostService implements SmartCardService {
 
   @override
   Future<List<ReaderDeviceInfo>> listReaders() async {
+    if (!Platform.isAndroid) {
+      return [];
+    }
+
     try {
       // In Android, USB CCID devices are discovered via android.hardware.usb.UsbManager
       final device = ReaderDiscovery.inspectReader('USB OTG CCID Smart Card Reader (072F:2200)', properties: {
@@ -121,6 +128,7 @@ class AndroidUsbHostService implements SmartCardService {
       AppLogger.error('Failed to list USB Host devices on Android: $e');
       _emit(SmartCardReaderState(
         status: SmartCardConnectionStatus.readerError,
+        errorCode: SmartCardErrorCode.noReader,
         errorMessage: 'Android USB Host permission or discovery error: $e',
         lastEventTime: DateTime.now(),
       ));
@@ -131,12 +139,25 @@ class AndroidUsbHostService implements SmartCardService {
   @override
   Future<bool> connect([String? readerName]) async {
     try {
-      final name = readerName ?? 'USB OTG CCID Smart Card Reader (072F:2200)';
+      final readers = await listReaders();
+      if (readers.isEmpty) {
+        _activeConnection = null;
+        _emit(SmartCardReaderState(
+          status: SmartCardConnectionStatus.disconnected,
+          errorCode: SmartCardErrorCode.noReader,
+          errorMessage: 'لا يوجد قارئ USB OTG متصل (noReader)',
+          lastEventTime: DateTime.now(),
+        ));
+        return false;
+      }
+
+      final name = readerName ?? readers.first.readerName;
       final deviceInfo = ReaderDiscovery.inspectReader(name);
 
       if (!deviceInfo.isCompatible) {
         _emit(SmartCardReaderState(
           status: SmartCardConnectionStatus.readerError,
+          errorCode: SmartCardErrorCode.protocolError,
           deviceInfo: deviceInfo,
           errorMessage: deviceInfo.errorMessage ?? 'Device is not a compatible CCID reader.',
           lastEventTime: DateTime.now(),
@@ -154,6 +175,7 @@ class AndroidUsbHostService implements SmartCardService {
         );
         _emit(SmartCardReaderState(
           status: SmartCardConnectionStatus.cardDetected,
+          errorCode: SmartCardErrorCode.none,
           deviceInfo: deviceInfo,
           cardInfo: card,
           lastEventTime: DateTime.now(),
@@ -162,7 +184,9 @@ class AndroidUsbHostService implements SmartCardService {
         _activeConnection = null;
         _emit(SmartCardReaderState(
           status: SmartCardConnectionStatus.cardWaiting,
+          errorCode: SmartCardErrorCode.noCard,
           deviceInfo: deviceInfo,
+          errorMessage: 'لا توجد شريحة مدرجة في القارئ (noCard)',
           lastEventTime: DateTime.now(),
         ));
       }
@@ -170,6 +194,7 @@ class AndroidUsbHostService implements SmartCardService {
     } catch (e) {
       _emit(SmartCardReaderState(
         status: SmartCardConnectionStatus.readerError,
+        errorCode: SmartCardErrorCode.protocolError,
         errorMessage: 'Android USB Host connect error: $e',
         lastEventTime: DateTime.now(),
       ));
@@ -183,6 +208,7 @@ class AndroidUsbHostService implements SmartCardService {
     _activeConnection = null;
     _emit(SmartCardReaderState(
       status: SmartCardConnectionStatus.disconnected,
+      errorCode: SmartCardErrorCode.none,
       lastEventTime: DateTime.now(),
     ));
   }
@@ -194,16 +220,7 @@ class AndroidUsbHostService implements SmartCardService {
 
   @override
   Future<CardInfo?> getCardInfo() async {
-    if (_currentState.cardInfo != null) {
-      return _currentState.cardInfo;
-    }
-    return CardInfo.fromPublicData(
-      atr: '3B 9F 95 80 1F C7 80 31 E0 73 FE 21 13 57 86 81 02 86 98 44',
-      iccid: '89213010012345678901',
-      imsi: '603010198765432',
-      msisdn: '0661123456',
-      protocolUsed: 'USB Host CCID (T=0)',
-    );
+    return _currentState.cardInfo;
   }
 
   @override

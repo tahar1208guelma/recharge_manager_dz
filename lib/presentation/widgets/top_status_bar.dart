@@ -172,7 +172,7 @@ class TopStatusBar extends StatelessWidget {
         badgeColor = AppColors.warning;
         bgColor = AppColors.warningBg;
         icon = Icons.hourglass_top;
-        statusText = '🟡 Card Waiting';
+        statusText = usb.isNoCard ? '🟡 لا توجد شريحة (noCard)' : '🟡 Card Waiting';
         break;
       case SmartCardConnectionStatus.readerConnected:
         badgeColor = AppColors.success;
@@ -184,13 +184,21 @@ class TopStatusBar extends StatelessWidget {
         badgeColor = AppColors.danger;
         bgColor = AppColors.dangerBg;
         icon = Icons.error_outline;
-        statusText = '🔴 Reader Error';
+        if (usb.isCardMuted) {
+          statusText = '🔴 شريحة صامتة (cardMuted)';
+        } else if (usb.isPinLocked) {
+          statusText = '🔒 شريحة مقفلة (pinLocked)';
+        } else if (usb.isProtocolError) {
+          statusText = '⚠️ خطأ اتصال (protocolError)';
+        } else {
+          statusText = '🔴 Reader Error';
+        }
         break;
       case SmartCardConnectionStatus.disconnected:
         badgeColor = AppColors.textMuted;
         bgColor = AppColors.lightCard;
         icon = Icons.usb_off;
-        statusText = '🔴 Reader Disconnected';
+        statusText = usb.isNoReader ? '⚪ لا يوجد قارئ (noReader)' : '⚪ Disconnected';
         break;
     }
 

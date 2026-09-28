@@ -35,7 +35,7 @@ void main() {
     });
 
     test('GsmModemService should parse simulation responses correctly', () async {
-      final modem = GsmModemService();
+      final modem = GsmModemService(isSimulationMode: true);
       
       // Mobilis Flexy
       final mobResp = await modem.sendUssd('*630*0661123456*04*500*11111#');
@@ -48,6 +48,14 @@ void main() {
       expect(replyResp.isSuccess, true);
       expect(replyResp.isSessionOpen, false);
       expect(replyResp.cleanMessage.contains('بنجاح'), true);
+    });
+
+    test('GsmModemService in real mode without hardware returns hardware missing error', () async {
+      final modem = GsmModemService(isSimulationMode: false);
+      final resp = await modem.sendUssd('*630*0661123456*04*500*11111#');
+      expect(resp.isSuccess, false);
+      expect(resp.rawMessage, 'NO_MODEM');
+      expect(resp.error, contains('Hardware missing'));
     });
   });
 }

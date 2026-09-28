@@ -10,7 +10,7 @@ class SettingsProvider extends ChangeNotifier {
   String _storeName = AppConstants.defaultStoreName;
   String _storeAddress = AppConstants.defaultStoreAddress;
   String _storePhone = AppConstants.defaultStorePhone;
-  bool _mockMode = true;
+  bool _mockMode = false;
   ThemeMode _themeMode = ThemeMode.light;
 
   final Map<OperatorType, String> _operatorPins = {

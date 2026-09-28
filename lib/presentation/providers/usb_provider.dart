@@ -11,7 +11,7 @@ import '../../services/smart_card/smart_card_state.dart';
 import '../../services/ussd/gsm_modem_service.dart';
 
 class UsbProvider extends ChangeNotifier {
-  final SmartCardService _service;
+  SmartCardService _service;
   final GsmModemService modemService = GsmModemService();
   StreamSubscription<SmartCardReaderState>? _subscription;
   SmartCardReaderState _state;
@@ -21,10 +21,13 @@ class UsbProvider extends ChangeNotifier {
   String? _activeComPort;
   int _activeBaudRate = 115200;
   final Map<OperatorType, String> _operatorComPorts = {};
+  bool _isSimulationMode = false;
 
-  UsbProvider({SmartCardService? service})
-      : _service = service ?? SmartCardServiceFactory.create(),
-        _state = (service ?? SmartCardServiceFactory.create()).currentState {
+  UsbProvider({SmartCardService? service, bool isSimulationMode = false})
+      : _isSimulationMode = isSimulationMode,
+        _service = service ?? SmartCardServiceFactory.create(forceMock: isSimulationMode),
+        _state = (service ?? SmartCardServiceFactory.create(forceMock: isSimulationMode)).currentState {
+    modemService.isSimulationMode = _isSimulationMode;
     _subscription = _service.stateStream.listen((newState) {
       _state = newState;
       notifyListeners();
@@ -32,8 +35,16 @@ class UsbProvider extends ChangeNotifier {
     refreshReaders();
   }
 
+  bool get isSimulationMode => _isSimulationMode;
   SmartCardReaderState get state => _state;
   SmartCardConnectionStatus get status => _state.status;
+  SmartCardErrorCode get errorCode => _state.errorCode;
+  bool get isNoReader => _state.isNoReader;
+  bool get isNoCard => _state.isNoCard;
+  bool get isCardMuted => _state.isCardMuted;
+  bool get isPinLocked => _state.isPinLocked;
+  bool get isProtocolError => _state.isProtocolError;
+
   bool get isReaderConnected => _state.isReaderConnected;
   bool get isWaitingForCard => _state.isWaitingForCard;
   bool get hasCard => _state.hasCard;
@@ -42,13 +53,32 @@ class UsbProvider extends ChangeNotifier {
   ReaderDeviceInfo? get deviceInfo => _state.deviceInfo;
   String? get readerName => _state.readerName ?? deviceInfo?.readerName;
   OperatorType get detectedOperator => _state.detectedOperator;
-  String? get errorMessage => _state.errorMessage;
+  String? get errorMessage => _state.errorMessage ?? _state.formattedErrorMessage;
   List<ReaderDeviceInfo> get availableReaders => _availableReaders;
   String get simPin => _simPin;
   String? get lastExecutedUssd => _lastExecutedUssd;
   String? get activeComPort => _activeComPort;
   int get activeBaudRate => _activeBaudRate;
   Map<OperatorType, String> get operatorComPorts => Map.unmodifiable(_operatorComPorts);
+
+  void setSimulationMode(bool enabled) {
+    if (_isSimulationMode == enabled) return;
+    _isSimulationMode = enabled;
+    modemService.isSimulationMode = enabled;
+
+    _subscription?.cancel();
+    _service.dispose();
+
+    _service = SmartCardServiceFactory.create(forceMock: enabled);
+    _state = _service.currentState;
+    _subscription = _service.stateStream.listen((newState) {
+      _state = newState;
+      notifyListeners();
+    });
+    _service.initialize();
+    refreshReaders();
+    notifyListeners();
+  }
 
   void setActiveComPort(String? port, {int baudRate = 115200}) {
     _activeComPort = port;
@@ -128,6 +158,9 @@ class UsbProvider extends ChangeNotifier {
     return code;
   }
 
+  // ================= SIMULATION HELPERS =================
+  // Allowed ONLY inside MockSmartCardService under explicit Simulation Mode
+
   Future<void> simulateInsertSimCard(OperatorType operator) async {
     final s = _service;
     if (s is MockSmartCardService) {
@@ -142,10 +175,45 @@ class UsbProvider extends ChangeNotifier {
     }
   }
 
-  void simulateError(String errorMsg) {
+  void simulateNoReader() {
     final s = _service;
     if (s is MockSmartCardService) {
-      s.simulateError(errorMsg);
+      s.simulateNoReader();
+    }
+  }
+
+  void simulateNoCard() {
+    final s = _service;
+    if (s is MockSmartCardService) {
+      s.simulateNoCard();
+    }
+  }
+
+  void simulateCardMuted() {
+    final s = _service;
+    if (s is MockSmartCardService) {
+      s.simulateCardMuted();
+    }
+  }
+
+  void simulatePinLocked() {
+    final s = _service;
+    if (s is MockSmartCardService) {
+      s.simulatePinLocked();
+    }
+  }
+
+  void simulateProtocolError() {
+    final s = _service;
+    if (s is MockSmartCardService) {
+      s.simulateProtocolError();
+    }
+  }
+
+  void simulateError(String errorMsg, [SmartCardErrorCode errorCode = SmartCardErrorCode.protocolError]) {
+    final s = _service;
+    if (s is MockSmartCardService) {
+      s.simulateError(errorMsg, errorCode);
     }
   }
 

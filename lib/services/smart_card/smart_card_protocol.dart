@@ -6,6 +6,11 @@ class SmartCardProtocol {
   static const int insReadBinary = 0xB0;
   static const int insGetResponse = 0xC0;
 
+  // Standard Dedicated & Master Files
+  static const List<int> mfMaster = [0x3F, 0x00];  // Master File (Root)
+  static const List<int> dfGsm = [0x7F, 0x20];     // Dedicated File GSM (DF_GSM)
+  static const List<int> dfTelecom = [0x7F, 0x10]; // Dedicated File Telecom (DF_TELECOM)
+
   // Standard Public Elementary File (EF) IDs
   static const List<int> efIccid = [0x2F, 0xE2]; // Public Serial / ICCID
   static const List<int> efDir = [0x2F, 0x00];   // Application Directory
@@ -54,6 +59,9 @@ class SmartCardProtocol {
       isSuccess: isSuccess,
     );
   }
+
+  /// Decodes generic BCD nibbles
+  static String decodeBcd(List<int> rawBytes) => decodeBcdIccid(rawBytes);
 
   /// Decodes BCD-encoded (Binary Coded Decimal) ICCID from raw bytes
   static String decodeBcdIccid(List<int> rawBytes) {

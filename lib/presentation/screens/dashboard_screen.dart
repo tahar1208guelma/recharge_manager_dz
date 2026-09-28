@@ -157,25 +157,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
         badgeColor = AppColors.warning;
         bgColor = AppColors.warningBg;
         icon = Icons.hourglass_top;
-        statusLabel = '🟡 Card Waiting (Insert SIM to start)';
+        statusLabel = usb.isNoCard
+            ? '🟡 لا توجد شريحة في القارئ (noCard: Insert SIM)'
+            : '🟡 Card Waiting (Insert SIM to start)';
         break;
       case SmartCardConnectionStatus.readerConnected:
         badgeColor = AppColors.success;
         bgColor = AppColors.successBg;
         icon = Icons.usb;
-        statusLabel = '🟢 Reader Connected';
+        statusLabel = '🟢 Reader Connected (Ready for SIM)';
         break;
       case SmartCardConnectionStatus.readerError:
         badgeColor = AppColors.danger;
         bgColor = AppColors.dangerBg;
         icon = Icons.error_outline;
-        statusLabel = '🔴 Reader Error / Incompatible Hardware';
+        if (usb.isCardMuted) {
+          statusLabel = '🔴 الشريحة صامتة ولا تستجيب (cardMuted: Unresponsive ATR)';
+        } else if (usb.isPinLocked) {
+          statusLabel = '🔒 الشريحة مقفلة برمز PIN / PUK (pinLocked)';
+        } else if (usb.isProtocolError) {
+          statusLabel = '⚠️ خطأ في بروتوكول الاتصال (protocolError)';
+        } else {
+          statusLabel = '🔴 Reader Error / Incompatible Hardware';
+        }
         break;
       case SmartCardConnectionStatus.disconnected:
         badgeColor = AppColors.textMuted;
         bgColor = AppColors.lightCard;
         icon = Icons.usb_off;
-        statusLabel = '⚪ Reader Disconnected';
+        statusLabel = usb.isNoReader
+            ? '⚪ لم يتم العثور على قارئ متصل (noReader)'
+            : '⚪ Reader Disconnected';
         break;
     }
 
@@ -240,65 +252,81 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(width: 8),
 
-          // Simulation trigger menu for hardware testing
-          PopupMenuButton<String>(
-            tooltip: 'Hardware Simulator Actions',
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.lightCard,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.borderLight),
+          // Simulation trigger menu (Allowed ONLY inside MockSmartCardService in Simulation Mode)
+          if (usb.isSimulationMode)
+            PopupMenuButton<String>(
+              tooltip: 'Hardware Simulator Actions (Simulation Mode)',
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.lightCard,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.borderLight),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.sim_card, size: 16, color: AppColors.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      usb.hasCard ? 'SIM Inserted' : 'Simulate SIM',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.sim_card, size: 16, color: AppColors.primary),
-                  const SizedBox(width: 6),
-                  Text(
-                    usb.hasCard ? 'SIM Inserted' : 'Simulate SIM',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
+              onSelected: (action) {
+                if (action == 'mobilis') usb.simulateInsertSimCard(OperatorType.mobilis);
+                if (action == 'djezzy') usb.simulateInsertSimCard(OperatorType.djezzy);
+                if (action == 'ooredoo') usb.simulateInsertSimCard(OperatorType.ooredoo);
+                if (action == 'eject') usb.simulateNoCard();
+                if (action == 'no_reader') usb.simulateNoReader();
+                if (action == 'card_muted') usb.simulateCardMuted();
+                if (action == 'pin_locked') usb.simulatePinLocked();
+                if (action == 'protocol_error') usb.simulateProtocolError();
+                if (action == 'bad_device') usb.simulateIncompatibleReader();
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'mobilis',
+                  child: Text('🟢 Insert Mobilis SIM (0661123456)'),
+                ),
+                const PopupMenuItem(
+                  value: 'djezzy',
+                  child: Text('🟢 Insert Djezzy SIM (0770987654)'),
+                ),
+                const PopupMenuItem(
+                  value: 'ooredoo',
+                  child: Text('🟢 Insert Ooredoo SIM (0555432100)'),
+                ),
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'eject',
+                  child: Text('🟡 Eject SIM (noCard)'),
+                ),
+                const PopupMenuItem(
+                  value: 'no_reader',
+                  child: Text('⚪ Simulate No Reader (noReader)'),
+                ),
+                const PopupMenuItem(
+                  value: 'card_muted',
+                  child: Text('🔴 Simulate Card Muted (cardMuted)'),
+                ),
+                const PopupMenuItem(
+                  value: 'pin_locked',
+                  child: Text('🔒 Simulate PIN Locked (pinLocked)'),
+                ),
+                const PopupMenuItem(
+                  value: 'protocol_error',
+                  child: Text('⚠️ Simulate Protocol Error (protocolError)'),
+                ),
+                const PopupMenuItem(
+                  value: 'bad_device',
+                  child: Text('🔴 Simulate Incompatible USB Device'),
+                ),
+              ],
             ),
-            onSelected: (action) {
-              if (action == 'mobilis') usb.simulateInsertSimCard(OperatorType.mobilis);
-              if (action == 'djezzy') usb.simulateInsertSimCard(OperatorType.djezzy);
-              if (action == 'ooredoo') usb.simulateInsertSimCard(OperatorType.ooredoo);
-              if (action == 'eject') usb.simulateRemoveSimCard();
-              if (action == 'error') usb.simulateError('PC/SC card communication timeout');
-              if (action == 'bad_device') usb.simulateIncompatibleReader();
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'mobilis',
-                child: Text('🟢 Insert Mobilis SIM (0661123456)'),
-              ),
-              const PopupMenuItem(
-                value: 'djezzy',
-                child: Text('🟢 Insert Djezzy SIM (0770987654)'),
-              ),
-              const PopupMenuItem(
-                value: 'ooredoo',
-                child: Text('🟢 Insert Ooredoo SIM (0555432100)'),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'eject',
-                child: Text('🟡 Eject SIM (Card Waiting)'),
-              ),
-              const PopupMenuItem(
-                value: 'bad_device',
-                child: Text('🔴 Simulate Incompatible USB Device'),
-              ),
-              const PopupMenuItem(
-                value: 'error',
-                child: Text('🔴 Simulate Hardware Error'),
-              ),
-            ],
-          ),
-          if (usb.hasCard) ...[
+          if (usb.isSimulationMode && usb.hasCard) ...[
             const SizedBox(width: 8),
             IconButton(
               icon: const Icon(Icons.eject, color: AppColors.danger, size: 20),

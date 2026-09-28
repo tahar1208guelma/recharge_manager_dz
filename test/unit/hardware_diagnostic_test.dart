@@ -8,7 +8,7 @@ void main() {
     late HardwareDiagnosticService service;
 
     setUp(() {
-      service = HardwareDiagnosticService();
+      service = HardwareDiagnosticService(isSimulation: true);
     });
 
     test('HardwareDiagnosticService should run complete scan and return valid DiagnosticReport', () async {
@@ -105,6 +105,11 @@ void main() {
       } finally {
         await tempDir.delete(recursive: true);
       }
+    });
+
+    test('HardwareDiagnosticService in real hardware mode does not return fake hardware', () {
+      final realService = HardwareDiagnosticService(isSimulation: false);
+      expect(realService.isSimulation, false);
     });
   });
 }

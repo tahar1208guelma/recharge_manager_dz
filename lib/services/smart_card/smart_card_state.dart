@@ -10,8 +10,18 @@ enum SmartCardConnectionStatus {
   readerError,     // 🔴 Reader Error / Incompatible
 }
 
+enum SmartCardErrorCode {
+  none,
+  noReader,       // لا يوجد قارئ متصل
+  noCard,         // لا توجد شريحة في القارئ
+  cardMuted,      // الشريحة صامتة ولا تستجيب للـ ATR
+  pinLocked,      // الشريحة مقفلة برمز PIN / PUK
+  protocolError,  // خطأ في بروتوكول التخاطب أو نقل أوامر APDU
+}
+
 class SmartCardReaderState {
   final SmartCardConnectionStatus status;
+  final SmartCardErrorCode errorCode;
   final ReaderDeviceInfo? deviceInfo;
   final CardInfo? cardInfo;
   final String? errorMessage;
@@ -19,6 +29,7 @@ class SmartCardReaderState {
 
   const SmartCardReaderState({
     this.status = SmartCardConnectionStatus.disconnected,
+    this.errorCode = SmartCardErrorCode.none,
     this.deviceInfo,
     this.cardInfo,
     this.errorMessage,
@@ -34,7 +45,36 @@ class SmartCardReaderState {
 
   bool get hasCard => status == SmartCardConnectionStatus.cardDetected && cardInfo != null;
 
-  bool get hasError => status == SmartCardConnectionStatus.readerError || errorMessage != null;
+  bool get hasError =>
+      status == SmartCardConnectionStatus.readerError ||
+      errorMessage != null ||
+      errorCode != SmartCardErrorCode.none;
+
+  bool get isNoReader => errorCode == SmartCardErrorCode.noReader;
+  bool get isNoCard => errorCode == SmartCardErrorCode.noCard;
+  bool get isCardMuted => errorCode == SmartCardErrorCode.cardMuted;
+  bool get isPinLocked => errorCode == SmartCardErrorCode.pinLocked;
+  bool get isProtocolError => errorCode == SmartCardErrorCode.protocolError;
+
+  String? get formattedErrorMessage {
+    if (errorMessage != null && errorMessage!.isNotEmpty) {
+      return errorMessage;
+    }
+    switch (errorCode) {
+      case SmartCardErrorCode.noReader:
+        return 'لم يتم اكتشاف أي قارئ بطاقات ذكية متصل (noReader)';
+      case SmartCardErrorCode.noCard:
+        return 'القارئ متصل ولكن لا توجد شريحة مدرجة (noCard)';
+      case SmartCardErrorCode.cardMuted:
+        return 'البطاقة صامتة ولا تستجيب لإشارة التنشيط (cardMuted)';
+      case SmartCardErrorCode.pinLocked:
+        return 'شريحة الاتصال مقفلة وتتطلب إدخال رمز PIN (pinLocked)';
+      case SmartCardErrorCode.protocolError:
+        return 'حدث خطأ في بروتوكول الاتصال ونقل البيانات (protocolError)';
+      case SmartCardErrorCode.none:
+        return null;
+    }
+  }
 
   String? get readerName => deviceInfo?.readerName;
 
@@ -42,6 +82,7 @@ class SmartCardReaderState {
 
   SmartCardReaderState copyWith({
     SmartCardConnectionStatus? status,
+    SmartCardErrorCode? errorCode,
     ReaderDeviceInfo? deviceInfo,
     CardInfo? cardInfo,
     String? errorMessage,
@@ -49,6 +90,7 @@ class SmartCardReaderState {
   }) {
     return SmartCardReaderState(
       status: status ?? this.status,
+      errorCode: errorCode ?? this.errorCode,
       deviceInfo: deviceInfo ?? this.deviceInfo,
       cardInfo: cardInfo ?? this.cardInfo,
       errorMessage: errorMessage ?? this.errorMessage,

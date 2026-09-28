@@ -40,6 +40,9 @@ class GsmModemService {
   String? _activePort;
   int _activeBaudRate = 115200;
   bool _isConnected = false;
+  bool isSimulationMode;
+
+  GsmModemService({this.isSimulationMode = false});
 
   bool get isConnected => _isConnected;
   String? get activePort => _activePort;
@@ -54,13 +57,16 @@ class GsmModemService {
   /// Scans Windows for active GSM Modem COM ports with friendly hardware names
   Future<List<HardwarePortInfo>> listDetailedPorts() async {
     if (!Platform.isWindows) {
-      return [
-        HardwarePortInfo(
-          portName: 'AUTO',
-          friendlyName: 'محاكي الشريحة المباشر (SIM Direct Simulation)',
-          isModem: true,
-        ),
-      ];
+      if (isSimulationMode) {
+        return [
+          HardwarePortInfo(
+            portName: 'AUTO',
+            friendlyName: 'محاكي الشريحة المباشر (SIM Direct Simulation)',
+            isModem: true,
+          ),
+        ];
+      }
+      return [];
     }
 
     final portsMap = <String, HardwarePortInfo>{};
@@ -153,13 +159,16 @@ class GsmModemService {
     }
 
     if (portsMap.isEmpty) {
-      return [
-        HardwarePortInfo(
-          portName: 'AUTO',
-          friendlyName: 'محاكي الشريحة المباشر (SIM Direct Simulation)',
-          isModem: true,
-        ),
-      ];
+      if (isSimulationMode) {
+        return [
+          HardwarePortInfo(
+            portName: 'AUTO',
+            friendlyName: 'محاكي الشريحة المباشر (SIM Direct Simulation)',
+            isModem: true,
+          ),
+        ];
+      }
+      return [];
     }
 
     return portsMap.values.toList();
@@ -179,8 +188,14 @@ class GsmModemService {
     int? baudRate,
   }) async {
     final port = portName ?? _activePort;
-    if (port == null || port == 'AUTO' || !Platform.isWindows) {
-      return 'OK';
+    if (port == null) {
+      return 'ERR: لا يوجد منفذ تسلسلي محدد (No Port Selected)';
+    }
+    if (port == 'AUTO') {
+      return isSimulationMode ? 'OK' : 'ERR: وضع المحاكاة غير مفعل (Simulation Mode Disabled)';
+    }
+    if (!Platform.isWindows) {
+      return isSimulationMode ? 'OK' : 'ERR: منصة التشغيل لا تدعم المنافذ التسلسلية المباشرة بدون محاكاة';
     }
 
     final baud = baudRate ?? _activeBaudRate;
@@ -312,14 +327,38 @@ try {
             rawMessage: raw,
             cleanMessage: 'تم إرسال الأمر للشريحة بنجاح.',
           );
+        } else {
+          return ModemResponse(
+            isSuccess: false,
+            isSessionOpen: false,
+            rawMessage: raw,
+            cleanMessage: 'استجابة غير متوقعة من المودم: $raw',
+            error: raw,
+          );
         }
       } catch (e) {
         AppLogger.warn('Direct COM port execution error: $e');
+        return ModemResponse(
+          isSuccess: false,
+          isSessionOpen: false,
+          rawMessage: 'ERR: $e',
+          cleanMessage: 'خطأ في الاتصال بمنفذ المودم: $e',
+          error: e.toString(),
+        );
       }
     }
 
-    // High-Fidelity Telecom Interactive Simulator (for seamless POS execution when no modem attached)
-    return _simulateTelecomNetworkResponse(ussdCode);
+    if (isSimulationMode) {
+      return _simulateTelecomNetworkResponse(ussdCode);
+    }
+
+    return ModemResponse(
+      isSuccess: false,
+      isSessionOpen: false,
+      rawMessage: 'NO_MODEM',
+      cleanMessage: 'لا يوجد مودم GSM متصل لإرسال أمر USSD (يرجى توصيل المودم أو تفعيل وضع المحاكاة)',
+      error: 'Hardware missing: No active GSM modem configured',
+    );
   }
 
   /// Parses raw AT +CUSD response format: `+CUSD: <m>, "<str>", <dcs>`

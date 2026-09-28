@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:recharge_manager_dz/core/constants/operator_constants.dart';
 import 'package:recharge_manager_dz/services/smart_card/platforms/mock_smart_card_service.dart';
 import 'package:recharge_manager_dz/services/smart_card/platforms/windows_pcsc_service.dart';
+import 'package:recharge_manager_dz/services/smart_card/reader_device_info.dart';
 import 'package:recharge_manager_dz/services/smart_card/reader_discovery.dart';
 import 'package:recharge_manager_dz/services/smart_card/smart_card_protocol.dart';
 import 'package:recharge_manager_dz/services/smart_card/smart_card_state.dart';
@@ -110,6 +111,28 @@ void main() {
       expect(smartCardService.currentState.errorMessage, isNotNull);
     });
 
+    test('Simulate typed error states (noReader, noCard, cardMuted, pinLocked, protocolError)', () {
+      smartCardService.simulateNoReader();
+      expect(smartCardService.currentState.isNoReader, true);
+      expect(smartCardService.currentState.errorCode, SmartCardErrorCode.noReader);
+
+      smartCardService.simulateNoCard();
+      expect(smartCardService.currentState.isNoCard, true);
+      expect(smartCardService.currentState.errorCode, SmartCardErrorCode.noCard);
+
+      smartCardService.simulateCardMuted();
+      expect(smartCardService.currentState.isCardMuted, true);
+      expect(smartCardService.currentState.errorCode, SmartCardErrorCode.cardMuted);
+
+      smartCardService.simulatePinLocked();
+      expect(smartCardService.currentState.isPinLocked, true);
+      expect(smartCardService.currentState.errorCode, SmartCardErrorCode.pinLocked);
+
+      smartCardService.simulateProtocolError();
+      expect(smartCardService.currentState.isProtocolError, true);
+      expect(smartCardService.currentState.errorCode, SmartCardErrorCode.protocolError);
+    });
+
     test('Active CardConnection transmits ISO 7816-4 APDUs', () async {
       await smartCardService.insertSimCard(OperatorType.mobilis);
       final conn = smartCardService.activeConnection;
@@ -123,11 +146,28 @@ void main() {
   });
 
   group('WindowsPcscService Tests', () {
-    test('WindowsPcscService initializes and handles reader enumeration', () async {
+    test('WindowsPcscService initializes and handles reader enumeration without fake data', () async {
       final pcsc = WindowsPcscService();
+      await pcsc.initialize();
       final readers = await pcsc.listReaders();
-      expect(readers.isNotEmpty, true);
-      expect(readers.first.protocol, 'PC/SC (CCID)');
+      expect(readers, isA<List<ReaderDeviceInfo>>());
+      if (readers.isEmpty) {
+        expect(pcsc.currentState.errorCode, SmartCardErrorCode.noReader);
+        expect(await pcsc.isCardPresent(), false);
+        expect(await pcsc.getCardInfo(), isNull);
+      } else {
+        expect(readers.first.protocol, 'PC/SC (CCID)');
+      }
+      pcsc.dispose();
+    });
+
+    test('WindowsPcscService exposes typed error states when hardware is missing', () async {
+      final pcsc = WindowsPcscService();
+      await pcsc.initialize();
+      if ((await pcsc.listReaders()).isEmpty) {
+        expect(pcsc.currentState.isNoReader, true);
+        expect(pcsc.currentState.formattedErrorMessage, contains('noReader'));
+      }
       pcsc.dispose();
     });
   });

@@ -33,7 +33,13 @@ class WindowsPcscCardConnection implements CardConnection {
     if (!_isConnected) {
       return SmartCardResponse(data: [], sw1: 0x6F, sw2: 0x00, isSuccess: false);
     }
-    return SmartCardProtocol.parseApduResponse([0x90, 0x00]);
+    final res = WinSCardNative.transmitApdu(readerName, apdu);
+    return SmartCardResponse(
+      data: (res['data'] as List<int>?) ?? [],
+      sw1: (res['sw1'] as int?) ?? 0x6F,
+      sw2: (res['sw2'] as int?) ?? 0x00,
+      isSuccess: res['isSuccess'] == true,
+    );
   }
 
   @override
@@ -50,7 +56,13 @@ class WindowsPcscCardConnection implements CardConnection {
 
   @override
   Future<SmartCardResponse> getResponse(int length, {bool isGsm = false}) async {
-    final apdu = [isGsm ? SmartCardProtocol.claGsm : SmartCardProtocol.claIso, SmartCardProtocol.insGetResponse, 0x00, 0x00, length];
+    final apdu = [
+      isGsm ? SmartCardProtocol.claGsm : SmartCardProtocol.claIso,
+      SmartCardProtocol.insGetResponse,
+      0x00,
+      0x00,
+      length
+    ];
     return await transmit(apdu);
   }
 
@@ -70,6 +82,7 @@ class WindowsPcscService implements SmartCardService {
   WindowsPcscService()
       : _currentState = SmartCardReaderState(
           status: SmartCardConnectionStatus.disconnected,
+          errorCode: SmartCardErrorCode.none,
           lastEventTime: DateTime.now(),
         );
 
@@ -102,9 +115,9 @@ class WindowsPcscService implements SmartCardService {
       await connect(readers.first.readerName);
     } else {
       _emit(SmartCardReaderState(
-        status: SmartCardConnectionStatus.cardDetected,
-        deviceInfo: ReaderDiscovery.inspectReader('USB Smart Card Reader (WinSCard PC/SC)'),
-        cardInfo: await getCardInfo(),
+        status: SmartCardConnectionStatus.disconnected,
+        errorCode: SmartCardErrorCode.noReader,
+        errorMessage: 'لم يتم العثور على أي قارئ بطاقات ذكية متصل (noReader)',
         lastEventTime: DateTime.now(),
       ));
     }
@@ -118,34 +131,75 @@ class WindowsPcscService implements SmartCardService {
       if (Platform.isWindows) {
         final rawNames = await WinSCardNative.listAllReaders();
         if (rawNames.isNotEmpty) {
-          AppLogger.info('Discovered Windows Hardware Readers & Ports: $rawNames');
+          AppLogger.info('Discovered Windows Hardware Readers: $rawNames');
           return rawNames.map((name) => ReaderDiscovery.inspectReader(name)).toList();
         }
       }
-
-      final defaultReader = ReaderDiscovery.inspectReader('USB Smart Card Reader (WinSCard PC/SC)');
-      return [defaultReader];
+      return [];
     } catch (e) {
       AppLogger.error('Failed to list PC/SC readers on Windows: $e');
-      return [ReaderDiscovery.inspectReader('USB Smart Card Reader (WinSCard PC/SC)')];
+      return [];
     }
   }
 
   @override
   Future<bool> connect([String? readerName]) async {
     try {
-      final targetName = readerName ?? 'USB Smart Card Reader (WinSCard PC/SC)';
+      final readers = await listReaders();
+      if (readers.isEmpty) {
+        _activeConnection = null;
+        _emit(SmartCardReaderState(
+          status: SmartCardConnectionStatus.disconnected,
+          errorCode: SmartCardErrorCode.noReader,
+          errorMessage: 'لا يوجد قارئ بطاقات متصل (noReader)',
+          lastEventTime: DateTime.now(),
+        ));
+        return false;
+      }
+
+      final targetName = readerName ?? readers.first.readerName;
       final deviceInfo = ReaderDiscovery.inspectReader(targetName);
 
-      final card = await getCardInfo();
+      if (!deviceInfo.isCompatible) {
+        _activeConnection = null;
+        _emit(SmartCardReaderState(
+          status: SmartCardConnectionStatus.readerError,
+          errorCode: SmartCardErrorCode.protocolError,
+          deviceInfo: deviceInfo,
+          errorMessage: deviceInfo.errorMessage ?? 'قارئ البطاقات غير متوافق مع نظام CCID',
+          lastEventTime: DateTime.now(),
+        ));
+        return false;
+      }
+
+      final status = WinSCardNative.checkCardStatus(targetName);
+      final isHardwarePresent = status['isPresent'] == true;
+      final atr = status['atr'] as String?;
+      final SmartCardErrorCode err = (status['errorCode'] as SmartCardErrorCode?) ?? SmartCardErrorCode.none;
+
+      if (!isHardwarePresent) {
+        _activeConnection = null;
+        _emit(SmartCardReaderState(
+          status: SmartCardConnectionStatus.cardWaiting,
+          errorCode: SmartCardErrorCode.noCard,
+          deviceInfo: deviceInfo,
+          errorMessage: 'القارئ جاهز ولكن لا توجد شريحة مدرجة (noCard)',
+          lastEventTime: DateTime.now(),
+        ));
+        return true;
+      }
+
       _activeConnection = WindowsPcscCardConnection(
         readerName: targetName,
         protocol: 'T=0',
-        atr: card?.atr,
+        atr: atr,
       );
 
+      final card = await _readRealCardFromConnection(_activeConnection!, atr);
+
       _emit(SmartCardReaderState(
-        status: SmartCardConnectionStatus.cardDetected,
+        status: card != null ? SmartCardConnectionStatus.cardDetected : SmartCardConnectionStatus.cardWaiting,
+        errorCode: card != null ? SmartCardErrorCode.none : err,
         deviceInfo: deviceInfo,
         cardInfo: card,
         lastEventTime: DateTime.now(),
@@ -155,10 +209,57 @@ class WindowsPcscService implements SmartCardService {
     } catch (e) {
       _emit(SmartCardReaderState(
         status: SmartCardConnectionStatus.readerError,
+        errorCode: SmartCardErrorCode.protocolError,
         errorMessage: 'Connect error: $e',
         lastEventTime: DateTime.now(),
       ));
       return false;
+    }
+  }
+
+  Future<CardInfo?> _readRealCardFromConnection(CardConnection conn, String? atr) async {
+    try {
+      // 1. Select MF
+      final selMf = await conn.selectFile(SmartCardProtocol.mfMaster);
+      if (!selMf.isSuccess && selMf.sw1 != 0x9F && selMf.sw1 != 0x61) {
+        return null;
+      }
+
+      // 2. Select EF_ICCID
+      final selIccid = await conn.selectFile(SmartCardProtocol.efIccid);
+      String? iccid;
+      if (selIccid.isSuccess || selIccid.sw1 == 0x9F || selIccid.sw1 == 0x61) {
+        final len = selIccid.sw2 > 0 ? selIccid.sw2 : 10;
+        final readIccid = await conn.readBinary(0, len);
+        if (readIccid.isSuccess && readIccid.data.isNotEmpty) {
+          iccid = SmartCardProtocol.decodeBcdIccid(readIccid.data);
+        }
+      }
+
+      // 3. Select DF_GSM and EF_IMSI
+      await conn.selectFile(SmartCardProtocol.dfGsm, isGsm: true);
+      final selImsi = await conn.selectFile(SmartCardProtocol.efImsi, isGsm: true);
+      String? imsi;
+      if (selImsi.isSuccess || selImsi.sw1 == 0x9F || selImsi.sw1 == 0x61) {
+        final len = selImsi.sw2 > 0 ? selImsi.sw2 : 9;
+        final readImsi = await conn.readBinary(0, len, isGsm: true);
+        if (readImsi.isSuccess && readImsi.data.isNotEmpty) {
+          imsi = SmartCardProtocol.decodeBcdImsi(readImsi.data);
+        }
+      }
+
+      if (iccid != null || imsi != null || atr != null) {
+        return CardInfo.fromPublicData(
+          atr: atr ?? '',
+          iccid: iccid ?? '',
+          imsi: imsi,
+          msisdn: null,
+          protocolUsed: 'PC/SC WinSCard (${conn.protocol})',
+        );
+      }
+      return null;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -167,33 +268,52 @@ class WindowsPcscService implements SmartCardService {
     _statusMonitorTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       try {
         final readers = await listReaders();
-        if (readers.isEmpty) return;
-
-        final primaryReader = _currentState.deviceInfo ?? readers.first;
-        bool isHardwarePresent = true;
-        String? atr;
-
-        if (Platform.isWindows) {
-          final status = WinSCardNative.checkCardStatus(primaryReader.readerName);
-          isHardwarePresent = status['isPresent'] == true;
-          atr = status['atr'];
+        if (readers.isEmpty) {
+          if (_currentState.status != SmartCardConnectionStatus.disconnected ||
+              _currentState.errorCode != SmartCardErrorCode.noReader) {
+            _emit(SmartCardReaderState(
+              status: SmartCardConnectionStatus.disconnected,
+              errorCode: SmartCardErrorCode.noReader,
+              errorMessage: 'لم يتم العثور على أي قارئ بطاقات ذكية متصل (noReader)',
+              lastEventTime: DateTime.now(),
+            ));
+          }
+          return;
         }
 
-        if (isHardwarePresent && !_currentState.hasCard) {
-          final card = CardInfo.fromPublicData(
-            atr: atr ?? '3B 9F 95 80 1F C7 80 31 E0 73 FE 21 13 57 86 81 02 86 98 44',
-            iccid: '89213010012345678901',
-            imsi: '603010198765432',
-            msisdn: '0661123456',
-            protocolUsed: 'PC/SC WinSCard (T=0)',
-          );
+        final primaryReader = _currentState.deviceInfo ?? readers.first;
+        final status = WinSCardNative.checkCardStatus(primaryReader.readerName);
+        final bool isHardwarePresent = status['isPresent'] == true;
+        final String? atr = status['atr'];
+        final SmartCardErrorCode err = (status['errorCode'] as SmartCardErrorCode?) ?? SmartCardErrorCode.none;
 
-          _emit(SmartCardReaderState(
-            status: SmartCardConnectionStatus.cardDetected,
-            deviceInfo: primaryReader,
-            cardInfo: card,
-            lastEventTime: DateTime.now(),
-          ));
+        if (isHardwarePresent) {
+          if (!_currentState.hasCard) {
+            _activeConnection = WindowsPcscCardConnection(
+              readerName: primaryReader.readerName,
+              protocol: 'T=0',
+              atr: atr,
+            );
+            final card = await _readRealCardFromConnection(_activeConnection!, atr);
+            _emit(SmartCardReaderState(
+              status: card != null ? SmartCardConnectionStatus.cardDetected : SmartCardConnectionStatus.cardWaiting,
+              errorCode: card != null ? SmartCardErrorCode.none : err,
+              deviceInfo: primaryReader,
+              cardInfo: card,
+              lastEventTime: DateTime.now(),
+            ));
+          }
+        } else {
+          if (_currentState.hasCard || _currentState.status == SmartCardConnectionStatus.disconnected) {
+            _activeConnection = null;
+            _emit(SmartCardReaderState(
+              status: SmartCardConnectionStatus.cardWaiting,
+              errorCode: SmartCardErrorCode.noCard,
+              deviceInfo: primaryReader,
+              errorMessage: 'لا توجد شريحة مدرجة في القارئ (noCard)',
+              lastEventTime: DateTime.now(),
+            ));
+          }
         }
       } catch (_) {}
     });
@@ -206,27 +326,24 @@ class WindowsPcscService implements SmartCardService {
     _activeConnection = null;
     _emit(SmartCardReaderState(
       status: SmartCardConnectionStatus.disconnected,
+      errorCode: SmartCardErrorCode.none,
       lastEventTime: DateTime.now(),
     ));
   }
 
   @override
   Future<bool> isCardPresent() async {
-    return true;
+    if (!Platform.isWindows) return false;
+    final readers = await listReaders();
+    if (readers.isEmpty) return false;
+    final primary = _currentState.deviceInfo?.readerName ?? readers.first.readerName;
+    final status = WinSCardNative.checkCardStatus(primary);
+    return status['isPresent'] == true;
   }
 
   @override
   Future<CardInfo?> getCardInfo() async {
-    if (_currentState.cardInfo != null) {
-      return _currentState.cardInfo;
-    }
-    return CardInfo.fromPublicData(
-      atr: '3B 9F 95 80 1F C7 80 31 E0 73 FE 21 13 57 86 81 02 86 98 44',
-      iccid: '89213010012345678901',
-      imsi: '603010198765432',
-      msisdn: '0661123456',
-      protocolUsed: 'PC/SC WinSCard (T=0)',
-    );
+    return _currentState.cardInfo;
   }
 
   @override

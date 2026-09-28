@@ -6,16 +6,19 @@ import 'models/serial_port_info.dart';
 
 class HardwareDetector {
   /// Scans Windows for all attached serial hardware and smart card devices
-  static Future<List<SerialPortInfo>> scanAttachedDevices() async {
+  static Future<List<SerialPortInfo>> scanAttachedDevices({bool allowMock = false}) async {
     if (!Platform.isWindows) {
-      return [
-        const SerialPortInfo(
-          portName: 'MOCK_MODEM',
-          friendlyName: 'محاكي مودم الاتصالات (Mock GSM Modem Simulator)',
-          description: 'Software Simulation Modem for POS Testing',
-          deviceType: HardwareDeviceType.mockDevice,
-        ),
-      ];
+      if (allowMock) {
+        return [
+          const SerialPortInfo(
+            portName: 'MOCK_MODEM',
+            friendlyName: 'محاكي مودم الاتصالات (Mock GSM Modem Simulator)',
+            description: 'Software Simulation Modem for POS Testing',
+            deviceType: HardwareDeviceType.mockDevice,
+          ),
+        ];
+      }
+      return [];
     }
 
     final portsMap = <String, SerialPortInfo>{};
@@ -126,7 +129,7 @@ Get-CimInstance Win32_PnPEntity | Where-Object {
       AppLogger.warn('HardwareDetector scan error: $e');
     }
 
-    if (portsMap.isEmpty) {
+    if (portsMap.isEmpty && allowMock) {
       return [
         const SerialPortInfo(
           portName: 'MOCK_MODEM',

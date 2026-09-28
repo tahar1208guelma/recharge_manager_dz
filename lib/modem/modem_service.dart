@@ -14,12 +14,15 @@ import 'models/serial_port_info.dart';
 import 'models/unsolicited_response.dart';
 
 class ModemService {
+  final IModemDriver? _injectedDriver;
   IModemDriver _driver;
   SerialPortInfo? _activeDevice;
   final _connectionStateController = StreamController<bool>.broadcast();
+  bool isSimulationMode;
 
-  ModemService({IModemDriver? driver})
-      : _driver = driver ?? (Platform.isWindows ? GenericAtModemDriver() : MockModemDriver());
+  ModemService({IModemDriver? driver, this.isSimulationMode = false})
+      : _injectedDriver = driver,
+        _driver = driver ?? (isSimulationMode ? MockModemDriver() : GenericAtModemDriver());
 
   IModemDriver get driver => _driver;
   bool get isConnected => _driver.isConnected;
@@ -32,14 +35,16 @@ class ModemService {
 
   /// Scans for all connected serial and smart card devices
   Future<List<SerialPortInfo>> scanDevices() async {
-    return await HardwareDetector.scanAttachedDevices();
+    return await HardwareDetector.scanAttachedDevices(allowMock: isSimulationMode);
   }
 
   /// Connects to a specific serial port, auto-selecting appropriate driver
   Future<bool> connect(SerialPortInfo device, {int? baudRate}) async {
     AppLogger.info('ModemService: Connecting to ${device.portName} (${device.friendlyName})...');
 
-    if (device.deviceType == HardwareDeviceType.mockDevice || !Platform.isWindows) {
+    if (_injectedDriver != null) {
+      _driver = _injectedDriver;
+    } else if (isSimulationMode && (device.deviceType == HardwareDeviceType.mockDevice || !Platform.isWindows)) {
       _driver = MockModemDriver();
     } else if (device.friendlyName.toLowerCase().contains('huawei')) {
       _driver = HuaweiDriver();
