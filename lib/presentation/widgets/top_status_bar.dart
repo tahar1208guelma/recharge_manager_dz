@@ -184,7 +184,9 @@ class TopStatusBar extends StatelessWidget {
         badgeColor = AppColors.danger;
         bgColor = AppColors.dangerBg;
         icon = Icons.error_outline;
-        if (usb.isCardMuted) {
+        if (usb.errorCode == SmartCardErrorCode.unsupportedPlatform) {
+          statusText = '⛔ غير مدعوم (unsupportedPlatform)';
+        } else if (usb.isCardMuted) {
           statusText = '🔴 شريحة صامتة (cardMuted)';
         } else if (usb.isPinLocked) {
           statusText = '🔒 شريحة مقفلة (pinLocked)';

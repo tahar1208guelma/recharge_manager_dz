@@ -41,9 +41,9 @@ class OperatorConstants {
 
   static OperatorType detectFromImsi(String imsi) {
     final clean = imsi.trim();
-    if (clean.startsWith('60301') || clean.startsWith('6031')) return OperatorType.mobilis;
-    if (clean.startsWith('60302') || clean.startsWith('6032')) return OperatorType.djezzy;
-    if (clean.startsWith('60303') || clean.startsWith('6033')) return OperatorType.ooredoo;
+    if (clean.startsWith('60301')) return OperatorType.mobilis;
+    if (clean.startsWith('60302')) return OperatorType.djezzy;
+    if (clean.startsWith('60303')) return OperatorType.ooredoo;
     return OperatorType.unknown;
   }
 

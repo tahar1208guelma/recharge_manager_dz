@@ -1,6 +1,9 @@
 import '../../core/constants/operator_constants.dart';
 import 'card_info.dart';
 import 'reader_device_info.dart';
+import 'smart_card_error_code.dart';
+
+export 'smart_card_error_code.dart';
 
 enum SmartCardConnectionStatus {
   disconnected,
@@ -8,15 +11,6 @@ enum SmartCardConnectionStatus {
   cardWaiting,     // 🟡 Card Waiting (Reader ready, waiting for SIM insertion)
   cardDetected,    // 🔵 Card Detected (SIM present and read)
   readerError,     // 🔴 Reader Error / Incompatible
-}
-
-enum SmartCardErrorCode {
-  none,
-  noReader,       // لا يوجد قارئ متصل
-  noCard,         // لا توجد شريحة في القارئ
-  cardMuted,      // الشريحة صامتة ولا تستجيب للـ ATR
-  pinLocked,      // الشريحة مقفلة برمز PIN / PUK
-  protocolError,  // خطأ في بروتوكول التخاطب أو نقل أوامر APDU
 }
 
 class SmartCardReaderState {
@@ -55,6 +49,7 @@ class SmartCardReaderState {
   bool get isCardMuted => errorCode == SmartCardErrorCode.cardMuted;
   bool get isPinLocked => errorCode == SmartCardErrorCode.pinLocked;
   bool get isProtocolError => errorCode == SmartCardErrorCode.protocolError;
+  bool get isUnsupportedPlatform => errorCode == SmartCardErrorCode.unsupportedPlatform;
 
   String? get formattedErrorMessage {
     if (errorMessage != null && errorMessage!.isNotEmpty) {
@@ -71,6 +66,8 @@ class SmartCardReaderState {
         return 'شريحة الاتصال مقفلة وتتطلب إدخال رمز PIN (pinLocked)';
       case SmartCardErrorCode.protocolError:
         return 'حدث خطأ في بروتوكول الاتصال ونقل البيانات (protocolError)';
+      case SmartCardErrorCode.unsupportedPlatform:
+        return 'قراءة شرائح SIM عبر USB غير مدعومة على هذه المنصة (unsupportedPlatform)';
       case SmartCardErrorCode.none:
         return null;
     }

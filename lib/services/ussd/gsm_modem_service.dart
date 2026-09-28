@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import '../../../core/utils/app_logger.dart';
+import '../../modem/native/windows_serial_port.dart';
 
 class HardwarePortInfo {
   final String portName; // e.g. COM4
@@ -41,6 +42,7 @@ class GsmModemService {
   int _activeBaudRate = 115200;
   bool _isConnected = false;
   bool isSimulationMode;
+  final WindowsSerialPort _serialPort = WindowsSerialPort();
 
   GsmModemService({this.isSimulationMode = false});
 
@@ -201,58 +203,25 @@ class GsmModemService {
     final baud = baudRate ?? _activeBaudRate;
     AppLogger.info('GsmModemService: Executing "$command" on $port at $baud bps (timeout: ${timeoutMs}ms)');
 
-    // PowerShell script with DTR/RTS and buffer read loop
-    final escapedCmd = command.replaceAll('"', '`"').replaceAll("'", "''");
-    final script = """
-\$ErrorActionPreference = 'Stop'
-try {
-  \$port = New-Object System.IO.Ports.SerialPort '$port', $baud, [System.IO.Ports.Parity]::None, 8, [System.IO.Ports.StopBits]::One
-  \$port.DtrEnable = \$true
-  \$port.RtsEnable = \$true
-  \$port.ReadTimeout = $timeoutMs
-  \$port.WriteTimeout = 2000
-  \$port.NewLine = "`r`n"
-  \$port.Open()
-  
-  # Send AT Command
-  \$port.WriteLine("$escapedCmd")
-  Start-Sleep -Milliseconds 350
-  
-  \$sw = [System.Diagnostics.Stopwatch]::StartNew()
-  \$buffer = ""
-  while (\$sw.ElapsedMilliseconds -lt $timeoutMs) {
     try {
-      \$chunk = \$port.ReadExisting()
-      if (\$chunk -ne \$null -and \$chunk.Length -gt 0) {
-        \$buffer += \$chunk
-        if (\$buffer -match '\\+CUSD:' -or \$buffer -match 'OK\\r?\\n' -or \$buffer -match 'ERROR\\r?\\n') {
-          if (\$buffer -match '\\+CUSD:' -or "$escapedCmd" -notmatch 'AT\\+CUSD') {
-            break
-          }
+      if (!_serialPort.isOpen || _serialPort.portName != port.toUpperCase()) {
+        final ok = _serialPort.open(port, baudRate: baud);
+        if (!ok) {
+          return 'ERR: Failed to open serial port $port';
         }
       }
-    } catch {}
-    Start-Sleep -Milliseconds 150
-  }
-  
-  \$port.Close()
-  Write-Output \$buffer
-} catch {
-  Write-Output "ERR: \$_"
-}
-""";
 
-    try {
-      final res = await Process.run(
-        'powershell',
-        ['-NoProfile', '-Command', script],
-      ).timeout(Duration(milliseconds: timeoutMs + 3000));
+      final res = await _serialPort.sendCommand(
+        command,
+        timeout: Duration(milliseconds: timeoutMs),
+      );
 
-      if (res.exitCode == 0 && res.stdout != null) {
-        return res.stdout.toString().trim();
-      } else {
-        return 'ERR: ${res.stderr ?? "Execution failed"}';
+      if (res.contains('ERR: Port not open') || res.contains('ERR: Write failed')) {
+        _serialPort.close();
+        _isConnected = false;
       }
+
+      return res;
     } catch (e) {
       return 'ERR: $e';
     }
@@ -308,8 +277,9 @@ try {
     final port = portName ?? _activePort;
     if (Platform.isWindows && port != null && port != 'AUTO') {
       try {
+        final atCmd = ussdCode == '2' ? 'AT+CUSD=2' : 'AT+CUSD=1,"$ussdCode",15';
         final raw = await executeRawCommand(
-          'AT+CUSD=1,"$ussdCode",15',
+          atCmd,
           portName: port,
           timeoutMs: 8000,
           baudRate: baudRate,
@@ -373,10 +343,15 @@ try {
     if (match != null) {
       final mode = match.group(1);
       final rawStr = match.group(2) ?? '';
-      
-      // Check if text is encoded in Hex UCS2 (Arabic/Accented French)
-      cleanMessage = decodeUcs2Hex(rawStr);
-      
+      final dcs = match.group(3);
+
+      // Check if text is encoded in Hex UCS2 (dcs == 72 or pure hexadecimal)
+      if (dcs == '72' || (rawStr.length >= 4 && rawStr.length % 4 == 0 && RegExp(r'^[0-9A-Fa-f]+$').hasMatch(rawStr))) {
+        cleanMessage = decodeUcs2Hex(rawStr);
+      } else {
+        cleanMessage = rawStr;
+      }
+
       // mode 1 = user response required, mode 0 = no further action, mode 2 = terminated
       isSessionOpen = (mode == '1');
     }
@@ -484,6 +459,10 @@ try {
       rawMessage: '+CUSD: 0, "Execution terminee avec succes.", 15',
       cleanMessage: '✅ تم تنفيذ الطلب واستلام رد الشريحة بنجاح.',
     );
+  }
+
+  void dispose() {
+    _serialPort.close();
   }
 }
 

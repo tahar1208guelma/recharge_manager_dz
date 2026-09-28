@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import '../../core/utils/app_logger.dart';
+import '../../modem/native/windows_serial_port.dart';
 
 abstract class UsbSerialService {
   Stream<String> get serialDataStream;
@@ -16,55 +18,48 @@ abstract class UsbSerialService {
 
 class DefaultUsbSerialService implements UsbSerialService {
   final _controller = StreamController<String>.broadcast();
-  bool _isConnected = false;
-  String? _currentPort;
+  final WindowsSerialPort _serialPort = WindowsSerialPort();
 
   @override
   Stream<String> get serialDataStream => _controller.stream;
 
   @override
-  bool get isConnected => _isConnected;
+  bool get isConnected => _serialPort.isOpen;
 
   @override
-  String? get currentPort => _currentPort;
+  String? get currentPort => _serialPort.portName;
 
   @override
   Future<List<String>> listAvailablePorts() async {
-    // In production on Windows, queries Win32 SetupAPI / registry for COM ports
-    AppLogger.info('Scanning for USB Serial COM ports...');
-    return ['COM1 (System)', 'COM3 (USB Serial Dongle)'];
+    return WindowsSerialPort.listComPorts();
   }
 
   @override
   Future<bool> openPort(String portName, {int baudRate = 115200}) async {
-    AppLogger.info('Opening USB Serial port $portName at $baudRate baud...');
-    _currentPort = portName;
-    _isConnected = true;
-    _controller.add('PORT_OPENED: $portName');
-    return true;
+    if (!Platform.isWindows) {
+      AppLogger.warn('DefaultUsbSerialService: Serial hardware communication only supported on Windows');
+      return false;
+    }
+    final opened = _serialPort.open(portName, baudRate: baudRate);
+    if (opened) {
+      _controller.add('PORT_OPENED: $portName');
+    }
+    return opened;
   }
 
   @override
   Future<void> closePort() async {
-    if (_isConnected) {
-      AppLogger.info('Closing USB Serial port $_currentPort');
-      _isConnected = false;
-      _currentPort = null;
-      _controller.add('PORT_CLOSED');
+    if (_serialPort.isOpen) {
+      final port = _serialPort.portName;
+      _serialPort.close();
+      _controller.add('PORT_CLOSED: $port');
     }
   }
 
   @override
   Future<String?> sendAtCommand(String command, {Duration timeout = const Duration(seconds: 5)}) async {
-    if (!_isConnected) return null;
-    AppLogger.debug('USB Serial TX -> $command');
-    // Simulated AT response for official modems
-    if (command.startsWith('AT+CIMI')) {
-      return '603010123456789\r\nOK';
-    } else if (command.startsWith('AT+CSQ')) {
-      return '+CSQ: 24,99\r\nOK';
-    }
-    return 'OK';
+    if (!_serialPort.isOpen) return null;
+    return await _serialPort.sendCommand(command, timeout: timeout);
   }
 
   @override

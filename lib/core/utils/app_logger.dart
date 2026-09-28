@@ -1,6 +1,5 @@
-import 'package:flutter/foundation.dart';
-
 class AppLogger {
+  static const bool _isDebug = !bool.fromEnvironment('dart.vm.product');
   static final List<String> _logs = [];
   static const int _maxLogs = 500;
 
@@ -15,13 +14,14 @@ class AppLogger {
   static void error(String message, [Object? error, StackTrace? stackTrace]) {
     final extra = error != null ? ' | Error: $error' : '';
     _log('ERROR', '$message$extra');
-    if (stackTrace != null && kDebugMode) {
-      debugPrint(stackTrace.toString());
+    if (stackTrace != null && _isDebug) {
+      // ignore: avoid_print
+      print(stackTrace.toString());
     }
   }
 
   static void debug(String message) {
-    if (kDebugMode) {
+    if (_isDebug) {
       _log('DEBUG', message);
     }
   }
@@ -33,8 +33,9 @@ class AppLogger {
     if (_logs.length > _maxLogs) {
       _logs.removeAt(0);
     }
-    if (kDebugMode) {
-      debugPrint(entry);
+    if (_isDebug) {
+      // ignore: avoid_print
+      print(entry);
     }
   }
 

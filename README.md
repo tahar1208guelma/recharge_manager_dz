@@ -13,11 +13,19 @@ The software strictly replicates real physical SIM/phone behavior over serial AT
 
 ## 🚀 Key Features / الميزات الرئيسية
 
-### 1. 🔌 Hardware Abstraction Layer (HAL)
-- **Automatic Device Classification**: Strictly distinguishes between **PC/SC Smart Card Readers** (file reading only, no network) vs **USB GSM/SIM Modems** (cellular network & AT serial interface).
-- **OEM Vendor Drivers**: Specialized drivers for Huawei (E3531, E173, E303), ZTE (MF190, MF823, MF833), SIMCom (SIM800/900/7600), and Quectel (EC20/EC25), plus a universal 3GPP TS 27.007 Generic AT Driver.
-- **Hardware Flow Control**: Enforces `DTR = true` and `RTS = true` to eliminate buffer deadlocks on USB modems.
-- **Automatic COM Port Detection & Auto-Baud**: Scans Windows WMI and Registry to probe standard baud rates (115200, 57600, 38400, 9600).
+### 1. 🔌 Hardware Abstraction Layer (HAL) & Device Roles
+- **Clear Separation of Hardware Roles**:
+  - **PC/SC Smart Card Reader (WinSCard ISO 7816-4)**: Used exclusively for identifying the SIM card. Transmits low-level APDU commands via `winscard.dll` to read the Answer-To-Reset (ATR), Integrated Circuit Card ID (ICCID from `EF 2FE2`), and International Mobile Subscriber Identity (IMSI from `EF 6F07` under `7F20`), accurately detecting the operator (Mobilis, Djezzy, Ooredoo). **Note**: A smart card reader cannot connect to cellular towers, check live account balances, or execute USSD transactions.
+  - **GSM Modem / USB SIM Dongle (Serial AT Commands)**: Required for all cellular network transactions. Operates over serial COM ports via Windows Kernel32 FFI (`CreateFileW`, persistent handle, `DTR=true`, `RTS=true`) to send real 3GPP AT commands: checking live balance, executing Flexy/Storm/Arseli recharges via multi-step USSD (`AT+CUSD=1`), receiving network unsolicited notifications, and SMS.
+- **Standalone Diagnostic CLI Tool (`tool/pcsc_probe.dart`)**:
+  - Direct hardware probe tool that inspects real PC/SC readers and dumps complete hex APDU request/response traces:
+    ```bash
+    dart run tool/pcsc_probe.dart
+    ```
+- **Strict Zero-Fake-Data Architecture**:
+  - Hardware drivers never return simulated or hardcoded values when hardware is absent or muted. Typed error states (`noReader`, `noCard`, `cardMuted`, `pinLocked`, `protocolError`, `unsupportedPlatform`) are displayed with clear Arabic and French messages.
+  - Mock simulation is permitted strictly inside `MockSmartCardService` when "Simulation Mode" is turned on in Settings, accompanied by a prominent warning banner in the POS interface.
+- **OEM Vendor Drivers**: Specialized drivers for Huawei (E3531, E173, E303), ZTE (MF190, MF823, MF833), SIMCom (SIM800/900/7600), and Quectel (EC20/EC25), plus a persistent 3GPP TS 27.007 Generic AT Driver with auto-baud fallback (115200, 57600, 38400, 9600).
 
 ### 2. 📱 Operator Profiles & USSD Engine
 - **Configurable Templates**: Fully dynamic operator profiles stored in database (no hardcoded operator logic).
